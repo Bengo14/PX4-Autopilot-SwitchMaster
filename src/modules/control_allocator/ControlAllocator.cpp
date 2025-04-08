@@ -297,6 +297,16 @@ ControlAllocator::update_effectiveness_source()
 }
 
 void
+ControlAllocator::end_maneuver() {
+	_man_enabled = false;
+	_man_starting_time = 0;
+	PX4_INFO("--- MANEUVER ENDED ---");
+	auto_control_stand_by_mode_switch_master_s auto_control_stand_by_mode;
+	auto_control_stand_by_mode.enabled = false;
+	_auto_control_stand_by_mode_switch_master_pub.publish(auto_control_stand_by_mode);
+}
+
+void
 ControlAllocator::Run()
 {
 	if (should_exit()) {
@@ -324,6 +334,19 @@ ControlAllocator::Run()
 			// (e.g. a user could add/remove motors, such that the bitmask isn't correct anymore)
 			updateParams();
 			parameters_updated();
+		}
+
+		// Switch Master maneuver testing feature:
+		if (_param_man_test.get() && !_man_test_switch_state) {
+			_man_test_switch_state = true;
+			do_maneuver_switch_master_s do_maneuver_switch_master;
+			do_maneuver_switch_master.maneuver_index = _param_man_test_idx.get();
+			do_maneuver_switch_master.enabled = true;
+			_do_maneuver_switch_master_pub.publish(do_maneuver_switch_master);
+			PX4_WARN("EXECUTING MANEUVER TEST...");
+		}
+		else if (!_param_man_test.get() && _man_test_switch_state) {
+			_man_test_switch_state = false;
 		}
 	}
 
@@ -381,8 +404,8 @@ ControlAllocator::Run()
 
 	// Run allocator on torque changes
 	if (_vehicle_torque_setpoint_sub.update(&vehicle_torque_setpoint)) {
-		_torque_sp = matrix::Vector3f(vehicle_torque_setpoint.xyz);
 
+		_torque_sp = matrix::Vector3f(vehicle_torque_setpoint.xyz);
 		do_update = true;
 		_timestamp_sample = vehicle_torque_setpoint.timestamp_sample;
 
@@ -391,6 +414,7 @@ ControlAllocator::Run()
 	// Also run allocator on thrust setpoint changes if the torque setpoint
 	// has not been updated for more than 5ms
 	if (_vehicle_thrust_setpoint_sub.update(&vehicle_thrust_setpoint)) {
+
 		_thrust_sp = matrix::Vector3f(vehicle_thrust_setpoint.xyz);
 
 		if (dt > 5_ms) {
@@ -398,6 +422,315 @@ ControlAllocator::Run()
 			_timestamp_sample = vehicle_thrust_setpoint.timestamp_sample;
 		}
 	}
+
+	// ----- Switch Master project maneuver handling logic, DAER Polimi -----
+
+	do_maneuver_switch_master_s do_maneuver_switch_master;
+
+	if (_do_maneuver_switch_master_sub.update(&do_maneuver_switch_master)) {
+		if (_man_enabled && !do_maneuver_switch_master.enabled) {
+
+			char buffer[50];
+			switch (do_maneuver_switch_master.reason) {
+				case 0:
+					sprintf(buffer, "External kill switch");
+					break;
+				case 1:
+					sprintf(buffer, "Altitude or speed failure");
+					break;
+				case 2:
+					sprintf(buffer, "Attitude failure (pitch)");
+					break;
+				case 3:
+					sprintf(buffer, "Attitude failure (roll)");
+					break;
+				case 4:
+					sprintf(buffer, "Manual mode selected");
+					break;
+				case 5:
+					sprintf(buffer, "Horizontal limit reached");
+					break;
+				default:
+					sprintf(buffer, "Undefined reason");
+					break;
+			}
+			PX4_WARN("MANEUVER ABORTED DUE TO: %s", buffer);
+			end_maneuver();
+		}
+		else if (!_man_enabled && do_maneuver_switch_master.enabled) {
+			_man_enabled = true;
+		}
+	}
+
+	// if there is init message or the maneuver has already started
+	if (_man_enabled) {
+
+		// if first time save starting time and the other parameters
+		if (_man_starting_time == 0) {
+
+			updateParams();	// update changed params from storage (otherwise are not loaded in flight)
+			_man_starting_time = now;
+			_maneuver_index = do_maneuver_switch_master.maneuver_index;
+			_man_amplitude = _param_man_amplitude.get();
+			_man_duration = _param_man_duration.get();
+			_man_period = _param_man_period.get();
+			_man_delay = _param_man_delay.get();
+
+			auto_control_stand_by_mode_switch_master_s auto_control_stand_by_mode;
+			auto_control_stand_by_mode.enabled = true;
+			_auto_control_stand_by_mode_switch_master_pub.publish(auto_control_stand_by_mode);
+
+			switch (_maneuver_index) {
+				case 0:
+					PX4_INFO("EXECUTING PITCH DOUBLET...");
+					break;
+				case 1:
+					PX4_INFO("EXECUTING ROLL DOUBLET...");
+					break;
+				case 2:
+					PX4_INFO("EXECUTING YAW DOUBLET...");
+					break;
+				case 3:
+					PX4_INFO("EXECUTING PITCH 3-2-1-1...");
+					break;
+				case 4:
+					PX4_INFO("EXECUTING ROLL 3-2-1-1...");
+					break;
+				case 5:
+					PX4_INFO("EXECUTING YAW 3-2-1-1...");
+					break;
+				case 6:
+					PX4_INFO("EXECUTING ROLL + YAW DOUBLETS...");
+					break;
+				case 7:
+					PX4_INFO("EXECUTING ROLL + YAW 3-2-1-1...");
+					break;
+				case 8:
+					PX4_INFO("EXECUTING SEPARATED ROLL + YAW DOUBLETS...");
+					break;
+				default:
+					break;
+			}
+		}
+
+		float delta_time = (now - _man_starting_time) / 1e6f; // (s)
+		delta_time -= _man_delay;
+
+		if (_maneuver_index == 0) { // pitch doublet
+
+			if (delta_time < 0.0f) { // delay
+				publish_actuator_controls(true);
+
+			} else if (delta_time >= 0.0f && delta_time < _man_period) {
+				publish_actuator_controls(true, 0.0f, _man_amplitude);
+
+			} else if (delta_time >= _man_period && delta_time < 2.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, -_man_amplitude);
+
+			} else if (delta_time >= 2.0f *_man_period && delta_time <= _man_duration - _man_delay) { // free response
+				publish_actuator_controls(true);
+			} else {
+				end_maneuver();
+			}
+
+		} else if (_maneuver_index == 1) { // roll doublet
+
+			if (delta_time < 0.0f) { // delay
+				publish_actuator_controls(true);
+
+			} else if (delta_time >= 0.0f && delta_time < _man_period) {
+				publish_actuator_controls(true, _man_amplitude);
+
+			} else if (delta_time >= _man_period && delta_time < 2.0f *_man_period) {
+				publish_actuator_controls(true, -_man_amplitude);
+
+			} else if (delta_time >= 2.0f *_man_period && delta_time <= _man_duration - _man_delay) { // free response
+				publish_actuator_controls(true);
+			} else {
+				end_maneuver();
+			}
+
+		} else if (_maneuver_index == 2) { // yaw doublet
+
+			if (delta_time < 0.0f) { // delay
+				publish_actuator_controls(true);
+
+			} else if (delta_time >= 0.0f && delta_time < _man_period) {
+				publish_actuator_controls(true, 0.0f, 0.0f, _man_amplitude);
+
+			} else if (delta_time >= _man_period && delta_time < 2.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, 0.0f, -_man_amplitude);
+
+			} else if (delta_time >= 2.0f *_man_period && delta_time <= _man_duration - _man_delay) { // free response
+				publish_actuator_controls(true);
+			} else {
+				end_maneuver();
+			}
+
+		} else if (_maneuver_index == 3) { // pitch 3-2-1-1
+
+			if (delta_time < 0.0f) { // delay
+				publish_actuator_controls(true);
+
+			} else if (delta_time >= 0.0f && delta_time < 3.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, _man_amplitude);
+
+			} else if (delta_time >= 3.0f *_man_period && delta_time < 5.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, -_man_amplitude);
+
+			} else if (delta_time >= 5.0f *_man_period && delta_time < 6.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, _man_amplitude);
+
+			} else if (delta_time >= 6.0f *_man_period && delta_time < 7.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, -_man_amplitude);
+
+			} else if (delta_time >= 7.0f *_man_period && delta_time <= _man_duration - _man_delay) {
+				publish_actuator_controls(true);
+
+			} else {
+				end_maneuver();
+			}
+
+		} else if (_maneuver_index == 4) { // roll 3-2-1-1
+
+			if (delta_time < 0.0f) { // delay
+				publish_actuator_controls(true);
+
+			} else if (delta_time >= 0.0f && delta_time < 3.0f *_man_period) {
+				publish_actuator_controls(true, _man_amplitude);
+
+			} else if (delta_time >= 3.0f *_man_period && delta_time < 5.0f *_man_period) {
+				publish_actuator_controls(true, -_man_amplitude);
+
+			} else if (delta_time >= 5.0f *_man_period && delta_time < 6.0f *_man_period) {
+				publish_actuator_controls(true, _man_amplitude);
+
+			} else if (delta_time >= 6.0f *_man_period && delta_time < 7.0f *_man_period) {
+				publish_actuator_controls(true, -_man_amplitude);
+
+			} else if (delta_time >= 7.0f *_man_period && delta_time <= _man_duration - _man_delay) {
+				publish_actuator_controls(true);
+
+			} else {
+				end_maneuver();
+			}
+
+		} else if (_maneuver_index == 5) { // yaw 3-2-1-1
+
+			if (delta_time < 0.0f) { // delay
+				publish_actuator_controls(true);
+
+			} else if (delta_time >= 0.0f && delta_time < 3.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, 0.0f, _man_amplitude);
+
+			} else if (delta_time >= 3.0f *_man_period && delta_time < 5.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, 0.0f, -_man_amplitude);
+
+			} else if (delta_time >= 5.0f *_man_period && delta_time < 6.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, 0.0f, _man_amplitude);
+
+			} else if (delta_time >= 6.0f *_man_period && delta_time < 7.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, 0.0f, -_man_amplitude);
+
+			} else if (delta_time >= 7.0f *_man_period && delta_time <= _man_duration - _man_delay) {
+				publish_actuator_controls(true);
+
+			} else {
+				end_maneuver();
+			}
+
+		} else if (_maneuver_index == 6) { // roll + yaw doublet
+
+			if (delta_time < 0.0f) { // delay
+				publish_actuator_controls(true);
+
+			} else if (delta_time >= 0.0f && delta_time < _man_period) {
+				publish_actuator_controls(true, _man_amplitude); // roll left
+
+			} else if (delta_time >= _man_period && delta_time < 2.0f *_man_period) {
+				publish_actuator_controls(true, -_man_amplitude); // roll right
+
+			} else if (delta_time >= 2.0f *_man_period && delta_time < 3.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, 0.0f, -_man_amplitude); // yaw left
+
+			} else if (delta_time >= 3.0f *_man_period && delta_time < 4.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, 0.0f, _man_amplitude); // yaw right
+
+			} else if (delta_time >= 4.0f *_man_period && delta_time <= _man_duration - _man_delay) { // free response
+				publish_actuator_controls(true);
+
+			} else {
+				end_maneuver();
+			}
+		}
+
+		else if (_maneuver_index == 7) { // roll + yaw 3-2-1-1
+
+			if (delta_time < 0.0f) { // delay
+				publish_actuator_controls(true);
+
+			} else if (delta_time >= 0.0f && delta_time < 3.0f *_man_period) {
+				publish_actuator_controls(true, _man_amplitude); // roll left
+
+			} else if (delta_time >= 3.0f *_man_period && delta_time < 5.0f *_man_period) {
+				publish_actuator_controls(true, -_man_amplitude);
+
+			} else if (delta_time >= 5.0f *_man_period && delta_time < 6.0f *_man_period) {
+				publish_actuator_controls(true, _man_amplitude);
+
+			} else if (delta_time >= 6.0f *_man_period && delta_time < 7.0f *_man_period) {
+				publish_actuator_controls(true, -_man_amplitude);
+
+			} else if (delta_time >= 7.0f *_man_period && delta_time < 10.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, 0.0f, -_man_amplitude); // yaw left
+
+			} else if (delta_time >= 10.0f *_man_period && delta_time < 12.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, 0.0f, _man_amplitude);
+
+			} else if (delta_time >= 12.0f *_man_period && delta_time < 13.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, 0.0f, -_man_amplitude);
+
+			} else if (delta_time >= 13.0f *_man_period && delta_time < 14.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, 0.0f, _man_amplitude);
+
+			} else if (delta_time >= 14.0f *_man_period && delta_time <= _man_duration - _man_delay) {
+				publish_actuator_controls(true);
+
+			} else {
+				end_maneuver();
+			}
+		}
+
+		else if (_maneuver_index == 8) { // roll - free - yaw - free doublet
+
+			if (delta_time < 0.0f) { // delay
+				publish_actuator_controls(true);
+
+			} else if (delta_time >= 0.0f && delta_time < _man_period) {
+				publish_actuator_controls(true, _man_amplitude); // roll left
+
+			} else if (delta_time >= _man_period && delta_time < 2.0f *_man_period) {
+				publish_actuator_controls(true, -_man_amplitude);
+
+			} else if (delta_time >= 2.0f *_man_period && delta_time < 10.0f *_man_period) { // free response
+				publish_actuator_controls(true);
+
+			} else if (delta_time >= 10.0f *_man_period && delta_time < 11.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, 0.0f, -_man_amplitude); // yaw left
+
+			} else if (delta_time >= 11.0f *_man_period && delta_time < 12.0f *_man_period) {
+				publish_actuator_controls(true, 0.0f, 0.0f, _man_amplitude);
+
+			} else if (delta_time >= 12.0f *_man_period && delta_time <= _man_duration - _man_delay) { // free response
+				publish_actuator_controls(true);
+
+			} else {
+				end_maneuver();
+			}
+		}
+	}
+
+	//------------------------------------------------------------------------
 
 	if (do_update) {
 		_last_run = now;
@@ -435,7 +768,7 @@ ControlAllocator::Run()
 
 			// Do allocation
 			_control_allocation[i]->allocate();
-			_actuator_effectiveness->allocateAuxilaryControls(dt, i, _control_allocation[i]->_actuator_sp); //flaps and spoilers
+			_actuator_effectiveness->allocateAuxilaryControls(dt, i, _control_allocation[i]->_actuator_sp); // flaps and spoilers
 			_actuator_effectiveness->updateSetpoint(c[i], i, _control_allocation[i]->_actuator_sp,
 								_control_allocation[i]->getActuatorMin(), _control_allocation[i]->getActuatorMax());
 
@@ -447,8 +780,10 @@ ControlAllocator::Run()
 		}
 	}
 
-	// Publish actuator setpoint and allocator status
-	publish_actuator_controls();
+	// Switch Master: publish normal actuator setpoint ONLY IF NOT during a maneuver
+	if (_man_starting_time == 0) {
+		publish_actuator_controls();
+	}
 
 	// Publish status at limited rate, as it's somewhat expensive and we use it for slower dynamics
 	// (i.e. anti-integrator windup)
@@ -651,7 +986,7 @@ ControlAllocator::publish_control_allocator_status(int matrix_index)
 }
 
 void
-ControlAllocator::publish_actuator_controls()
+ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, float pitch, float yaw)
 {
 	if (!_publish_controls) {
 		return;
@@ -678,6 +1013,37 @@ ControlAllocator::publish_actuator_controls()
 	for (motors_idx = 0; motors_idx < _num_actuators[0] && motors_idx < actuator_motors_s::NUM_CONTROLS; motors_idx++) {
 		int selected_matrix = _control_allocation_selection_indexes[actuator_idx];
 		float actuator_sp = _control_allocation[selected_matrix]->getActuatorSetpoint()(actuator_idx_matrix[selected_matrix]);
+
+		// ---- Switch Master maneuver ----
+		if (exec_maneuver) {
+			if (!_offset_computed_motors) {
+				for (int i = 0; i < _num_actuators[0]; i++) {
+					_offset_motors[i] = 0.0f;
+				}
+				for (int j = 0; j < _num_actuators[0]; j++) {
+					for (int i = 0; i < WINDOW_SIZE; i++) {
+						_offset_motors[j] += _motors_latest_samples[j][i];
+					}
+					_offset_motors[j] /= (float)WINDOW_SIZE;
+				}
+				_offset_computed_motors = true;
+				char buffer[50];
+				sprintf(buffer, "Motors offset: ");
+				int p = 15;
+				for (int i = 0; i < _num_actuators[0]; i++) {
+					sprintf(&buffer[p], "%.2f ", (double)_offset_motors[i]);
+					p += 5;
+				}
+				PX4_INFO("%s", buffer);
+			}
+			actuator_sp = _offset_motors[motors_idx];
+		} else {
+			_motors_latest_samples[motors_idx][_counter] = actuator_sp;
+			if (_offset_computed_motors) {
+				_offset_computed_motors = false;
+			}
+		}
+
 		actuator_motors.control[motors_idx] = PX4_ISFINITE(actuator_sp) ? actuator_sp : NAN;
 
 		if (stopped_motors & (1u << motors_idx)) {
@@ -701,6 +1067,115 @@ ControlAllocator::publish_actuator_controls()
 		for (servos_idx = 0; servos_idx < _num_actuators[1] && servos_idx < actuator_servos_s::NUM_CONTROLS; servos_idx++) {
 			int selected_matrix = _control_allocation_selection_indexes[actuator_idx];
 			float actuator_sp = _control_allocation[selected_matrix]->getActuatorSetpoint()(actuator_idx_matrix[selected_matrix]);
+
+			// ---- Switch Master maneuver ----
+			if (exec_maneuver) {
+
+				if (servos_idx == 0) {
+					if (!_offset_computed_a) {
+						_offset_a = 0.0f;
+						for (int i = 0; i < WINDOW_SIZE; i++) {
+							_offset_a += _actuators_latest_samples[servos_idx][i];
+						}
+						_offset_a /= (float)WINDOW_SIZE;
+						_offset_computed_a = true;
+						PX4_INFO("Aileron offset: %.2f", (double)_offset_a);
+
+						if (fabsf(_offset_a) > 0.05f) {
+							PX4_WARN("Aileron offset too high, ending maneuver");
+							end_maneuver();
+							return;
+						}
+					}
+					actuator_sp = _offset_a + roll / 2.f;
+				}
+				else if (servos_idx == 1) {
+					actuator_sp = - (_offset_a + roll / 2.f);
+				}
+				else if (servos_idx == 2) {
+					if (!_offset_computed_e) {
+						_offset_e = 0.0f;
+						for (int i = 0; i < WINDOW_SIZE; i++) {
+							_offset_e += _actuators_latest_samples[servos_idx][i];
+						}
+						_offset_e /= (float)WINDOW_SIZE;
+						_offset_computed_e = true;
+						PX4_INFO("Elevator offset: %.2f", (double)_offset_e);
+					}
+					actuator_sp = _offset_e + pitch;
+				}
+				else if (servos_idx == 3) {
+					if (!_offset_computed_r) {
+						_offset_r = 0.0f;
+						for (int i = 0; i < WINDOW_SIZE; i++) {
+							_offset_r += _actuators_latest_samples[servos_idx][i];
+						}
+						_offset_r /= (float)WINDOW_SIZE;
+						_offset_computed_r = true;
+						PX4_INFO("Rudder offset: %.2f", (double)_offset_r);
+
+						if (fabsf(_offset_r) > 0.12f) {
+							PX4_WARN("Rudder offset too high, ending maneuver");
+							end_maneuver();
+							return;
+						}
+					}
+					actuator_sp = _offset_r + yaw;
+				} else {
+					actuator_sp = _servos_last_update[servos_idx];
+				}
+
+			} else {
+				if (servos_idx == 0) {
+					// update circular array with new sample
+					_actuators_latest_samples[servos_idx][_counter] = actuator_sp;
+					if (_offset_computed_a) {
+						_offset_computed_a = false;
+					}
+				}
+				else if (servos_idx == 2) {
+
+					// elevator max rate
+					const hrt_abstime now = hrt_absolute_time();
+					float delta_time = (now - _prev_time) / 1e6f;
+					_prev_time = now;
+					float rate = _param_act_max_rate.get();
+					float max_var = rate * delta_time;
+					max_var = math::constrain(max_var, 0.0004f, 0.04f);
+
+					if (_counter == -1) { // initialize (otherwise the starting value in PixHawk is out of bounds)
+						_counter++;
+						_actuators_latest_samples[servos_idx][WINDOW_SIZE - 1] = actuator_sp;
+					}
+					int prev = _counter == 0 ? WINDOW_SIZE - 1 : _counter - 1;
+
+					if (PX4_ISFINITE(_actuators_latest_samples[servos_idx][prev])) {
+						actuator_sp = math::constrain(actuator_sp, _actuators_latest_samples[servos_idx][prev] - max_var, _actuators_latest_samples[servos_idx][prev] + max_var);
+						actuator_sp = math::constrain(actuator_sp, -1.0f, 1.0f);
+					}
+					// printf("max var: %f, prev: %d, counter: %d, sp: %f, prev_sp: %f\n", (double)max_var, prev, _counter, (double)actuator_sp, (double)_actuators_latest_samples[servos_idx][prev]);
+					// update circular array with new sample
+					_actuators_latest_samples[servos_idx][_counter] = actuator_sp;
+					if (_offset_computed_e) {
+						_offset_computed_e = false;
+					}
+				}
+				else if (servos_idx == 3) {
+					// update circular array with new sample
+					_actuators_latest_samples[servos_idx][_counter] = actuator_sp;
+					if (_offset_computed_r) {
+						_offset_computed_r = false;
+					}
+					// counter increase
+					_counter++;
+					if (_counter == WINDOW_SIZE) {
+						_counter = 0;
+					}
+				} else {
+					_servos_last_update[servos_idx] = actuator_sp;
+				}
+			}
+
 			actuator_servos.control[servos_idx] = PX4_ISFINITE(actuator_sp) ? actuator_sp : NAN;
 			++actuator_idx_matrix[selected_matrix];
 			++actuator_idx;
@@ -728,12 +1203,12 @@ ControlAllocator::check_for_motor_failures()
 				switch ((FailureMode)_param_ca_failure_mode.get()) {
 				case FailureMode::REMOVE_FIRST_FAILING_MOTOR: {
 						// Count number of failed motors
-						const int num_motors_failed = math::countSetBits(failure_detector_status.motor_failure_mask);
+						//const int num_motors_failed = math::countSetBits(failure_detector_status.motor_failure_mask);
 
 						// Only handle if it is the first failure
-						if (_handled_motor_failure_bitmask == 0 && num_motors_failed == 1) {
+						if (true/*_handled_motor_failure_bitmask == 0 && num_motors_failed == 1*/) {
 							_handled_motor_failure_bitmask = failure_detector_status.motor_failure_mask;
-							PX4_WARN("Removing motor from allocation (0x%x)", _handled_motor_failure_bitmask);
+							PX4_WARN("Updating motor allocation (0x%x)", _handled_motor_failure_bitmask);
 
 							for (int i = 0; i < _num_control_allocation; ++i) {
 								_control_allocation[i]->setHadActuatorFailure(true);

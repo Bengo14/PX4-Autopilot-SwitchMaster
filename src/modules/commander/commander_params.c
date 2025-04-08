@@ -396,7 +396,7 @@ PARAM_DEFINE_FLOAT(COM_ARM_EKF_HGT, 1.0f);
  *
  * @group Commander
  * @min 0.1
- * @max 1.0
+ * @max 4.0
  * @decimal 2
  * @increment 0.05
  */

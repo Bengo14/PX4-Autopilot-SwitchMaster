@@ -45,7 +45,11 @@
 #include <lib/mathlib/math/filter/AlphaFilter.hpp>
 
 #include <uORB/Publication.hpp>
+#include <uORB/Subscription.hpp>
+#include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/tecs_status.h>
+#include <uORB/topics/glide_mode_switch_master.h>
+#include <uORB/topics/auto_control_stand_by_mode_switch_master.h>
 #include <uORB/uORB.h>
 #include <motion_planning/VelocitySmoothing.hpp>
 #include <motion_planning/ManualVelocitySmoothingZ.hpp>
@@ -211,6 +215,9 @@ public:
 		// Altitude control param
 		float altitude_error_gain;		///< Altitude error inverse time constant [1/s].
 		float altitude_setpoint_gain_ff;	///< Gain from altitude demand derivative to demanded climb rate.
+		bool is_gamma_sp;			///< Used for Switch Master gamma sp mode.
+		float target_sinkrate;
+		float target_climbrate;
 
 		// Airspeed control param
 		/// [0,1] percentage of true airspeed trim corresponding to expected (safe) true airspeed tracking errors
@@ -261,7 +268,7 @@ public:
 	};
 
 	/**
-	 * @brief Givent current measurement from the UAS.
+	 * @brief Given current measurement from the UAS.
 	 *
 	 */
 	struct Input {
@@ -408,7 +415,8 @@ private:
 	 * @param param is the control parameters.
 	 * @return controlled altitude rate setpoint in [m/s].
 	 */
-	float _calcAltitudeControlOutput(const Setpoint &setpoint, const Input &input, const Param &param) const;
+	float _calcAltitudeControlOutput(const Setpoint &setpoint, const Input &input, const Param &param);
+
 	/**
 	 * @brief Calculate specific energy rates.
 	 *
@@ -525,11 +533,16 @@ private:
 	float _calcThrottleControlOutput(const STERateLimit &limit, const ControlValues &ste_rate, const Param &param,
 					 const Flag &flag) const;
 
+	uORB::Subscription _glide_mode_switch_master_sub{ORB_ID(glide_mode_switch_master)}; // Switch Master glide mode trigger
+	uORB::Subscription _auto_control_stand_by_mode_switch_master_sub{ORB_ID(auto_control_stand_by_mode_switch_master)};
+
 private:
 	// State
 	AlphaFilter<float> _ste_rate_estimate_filter;		///< Low pass filter for the specific total energy rate.
 	float _pitch_integ_state{0.0f};				///< Pitch integrator state [rad].
 	float _throttle_integ_state{0.0f};			///< Throttle integrator state [-].
+	bool _glide_mode{false};				///< Switch Master glide mode.
+	bool _stand_by_mode{false};				///< Switch Master auto control stand by mode.
 
 	// Output
 	DebugOutput _debug_output;				///< Debug output.
@@ -704,6 +717,7 @@ private:
 		.throttle_min = 0.1f,
 		.altitude_error_gain = 0.2f,
 		.altitude_setpoint_gain_ff = 0.0f,
+		.is_gamma_sp = false,
 		.tas_error_percentage = 0.15f,
 		.airspeed_error_gain = 0.1f,
 		.ste_rate_time_const = 0.1f,

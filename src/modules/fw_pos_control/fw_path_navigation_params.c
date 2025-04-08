@@ -740,6 +740,299 @@ PARAM_DEFINE_FLOAT(FW_T_CLMB_R_SP, 3.0f);
 PARAM_DEFINE_FLOAT(FW_T_SINK_R_SP, 2.0f);
 
 /**
+ * Gamma setpoint climb mode
+ *
+ *
+ * Used for Switch Master project, flight path angle setpoint while climbing, to collect data at low J.
+ *
+ * @unit deg
+ * @min 0
+ * @max 40
+ * @decimal 1
+ * @increment 0.1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_GAMMA1_CLIMB, 10.0f);
+
+/**
+ * Gamma setpoint sink mode
+ *
+ *
+ * Used for Switch Master project, flight path angle setpoint while sinking, to collect data at high J.
+ * A negative value means glide mode (with zero thrust).
+ *
+ * @unit deg
+ * @min -1
+ * @max 25
+ * @decimal 1
+ * @increment 0.1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_GAMMA1_SINK, 10.0f);
+
+/**
+ * Gamma setpoint climb mode
+ *
+ *
+ * Used for Switch Master project, flight path angle setpoint while climbing, to collect data at low J.
+ *
+ * @unit deg
+ * @min 0
+ * @max 40
+ * @decimal 1
+ * @increment 0.1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_GAMMA2_CLIMB, 10.0f);
+
+/**
+ * Gamma setpoint sink mode
+ *
+ *
+ * Used for Switch Master project, flight path angle setpoint while sinking, to collect data at high J.
+ * A negative value means glide mode (with zero thrust).
+ *
+ * @unit deg
+ * @min -1
+ * @max 25
+ * @decimal 1
+ * @increment 0.1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_GAMMA2_SINK, 10.0f);
+
+/**
+ * Gamma setpoint climb mode
+ *
+ *
+ * Used for Switch Master project, flight path angle setpoint while climbing, to collect data at low J.
+ *
+ * @unit deg
+ * @min 0
+ * @max 40
+ * @decimal 1
+ * @increment 0.1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_GAMMA3_CLIMB, 10.0f);
+
+/**
+ * Gamma setpoint sink mode
+ *
+ *
+ * Used for Switch Master project, flight path angle setpoint while sinking, to collect data at high J.
+ * A negative value means glide mode (with zero thrust).
+ *
+ * @unit deg
+ * @min -1
+ * @max 25
+ * @decimal 1
+ * @increment 0.1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_GAMMA3_SINK, 10.0f);
+
+/**
+ * Gamma setpoint climb mode
+ *
+ *
+ * Used for Switch Master project, flight path angle setpoint while climbing, to collect data at low J.
+ *
+ * @unit deg
+ * @min 0
+ * @max 40
+ * @decimal 1
+ * @increment 0.1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_GAMMA4_CLIMB, 10.0f);
+
+/**
+ * Gamma setpoint sink mode
+ *
+ *
+ * Used for Switch Master project, flight path angle setpoint while sinking, to collect data at high J.
+ * A negative value means glide mode (with zero thrust).
+ *
+ * @unit deg
+ * @min -1
+ * @max 25
+ * @decimal 1
+ * @increment 0.1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_GAMMA4_SINK, 10.0f);
+
+/**
+ * Gamma setpoint climb mode
+ *
+ *
+ * Used for Switch Master project, flight path angle setpoint while climbing, to collect data at low J.
+ *
+ * @unit deg
+ * @min 0
+ * @max 40
+ * @decimal 1
+ * @increment 0.1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_GAMMA5_CLIMB, 10.0f);
+
+/**
+ * Gamma setpoint sink mode
+ *
+ *
+ * Used for Switch Master project, flight path angle setpoint while sinking, to collect data at high J.
+ * A negative value means glide mode (with zero thrust).
+ *
+ * @unit deg
+ * @min -1
+ * @max 25
+ * @decimal 1
+ * @increment 0.1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_GAMMA5_SINK, 10.0f);
+
+/**
+ * Gamma setpoint climb mode
+ *
+ *
+ * Used for Switch Master project, flight path angle setpoint while climbing, to collect data at low J.
+ *
+ * @unit deg
+ * @min 0
+ * @max 40
+ * @decimal 1
+ * @increment 0.1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_GAMMA6_CLIMB, 10.0f);
+
+/**
+ * Gamma setpoint sink mode
+ *
+ *
+ * Used for Switch Master project, flight path angle setpoint while sinking, to collect data at high J.
+ * A negative value means glide mode (with zero thrust).
+ *
+ * @unit deg
+ * @min -1
+ * @max 25
+ * @decimal 1
+ * @increment 0.1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_GAMMA6_SINK, 10.0f);
+
+/**
+ * Min delta distance for gamma setpoint
+ *
+ *
+ * Used for Switch Master project, minimum distance between two waypoints to activate gamma setpoint mode.
+ *
+ * @unit m
+ * @min 100
+ * @max 1000
+ * @decimal 0
+ * @increment 1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_MIN_WP_DIST, 400f);
+
+/**
+ * Type of maneuver to be executed
+ *
+ *
+ * Used for Switch Master project, type of open-loop maneuver for model identification.
+ * @value 0 pitch doublet
+ * @value 1 roll doublet
+ * @value 2 yaw doublet
+ * @value 3 pitch 3-2-1-1
+ * @value 4 roll 3-2-1-1
+ * @value 5 yaw 3-2-1-1
+ * @value 6 roll + yaw doublets
+ * @value 7 roll + yaw 3-2-1-1
+ * @value 8 roll + free + yaw + free doublets
+ *
+ * @min 0
+ * @max 8
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_INT32(FW_MAN_TYPE, 0);
+
+/**
+ * Enable maneuvers
+ *
+ *
+ * Used for Switch Master project, maneuver enabling parameter. Can also be used to abort an ongoing maneuver.
+ *
+ * @boolean
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_INT32(FW_MAN_EN, 0);
+
+/**
+ * Error threshold on airspeed to do the maneuver
+ *
+ *
+ * Used for Switch Master project, error threshold on airspeed to do the maneuver, both in climb and sink mode.
+ *
+ * @unit m/s
+ * @min 0.0
+ * @max 1.0
+ * @decimal 2
+ * @increment 0.01
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_MAN_VEL_ERR, 0.20f);
+
+/**
+ * Error threshold on gamma angle to do the maneuver
+ *
+ *
+ * Used for Switch Master project, error threshold on gamma angle to do the maneuver, both in climb and sink mode.
+ *
+ * @unit deg
+ * @min 0.0
+ * @max 5.0
+ * @decimal 1
+ * @increment 0.1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_MAN_GAMMA_ERR, 1.0f);
+
+/**
+ * Minimum time lasted since begin of climb/sink, to do the maneuver
+ *
+ *
+ * Used for Switch Master project, minimum time lasted since begin of climb/sink, to do the maneuver.
+ *
+ * @unit s
+ * @min 0.0
+ * @max 20.0
+ * @decimal 1
+ * @increment 0.1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_MAN_MIN_TIME, 10.0f);
+
+/**
+ * Minimum time since trim conditions started holding, to do the maneuver
+ *
+ *
+ * Used for Switch Master project, minimum time since trim conditions started holding, to do the maneuver.
+ *
+ * @unit s
+ * @min 0.0
+ * @max 5.0
+ * @decimal 1
+ * @increment 0.1
+ * @group SM MANEUVERS
+ */
+PARAM_DEFINE_FLOAT(FW_MAN_TRIM_TIME, 1.0f);
+
+/**
  * GPS failure loiter time
  *
  * The time in seconds the system should do open loop loiter and wait for GPS recovery

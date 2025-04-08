@@ -74,6 +74,7 @@ set(msg_files
 	DifferentialDriveSetpoint.msg
 	DifferentialPressure.msg
 	DistanceSensor.msg
+	DoManeuverSwitchMaster.msg
 	Ekf2Timestamps.msg
 	EscReport.msg
 	EscStatus.msg
@@ -109,6 +110,7 @@ set(msg_files
 	GimbalManagerSetAttitude.msg
 	GimbalManagerSetManualControl.msg
 	GimbalManagerStatus.msg
+	GlideModeSwitchMaster.msg
 	GotoSetpoint.msg
 	GpioConfig.msg
 	GpioIn.msg
@@ -204,6 +206,7 @@ set(msg_files
 	SystemPower.msg
 	TakeoffStatus.msg
 	TaskStackInfo.msg
+	AutoControlStandByModeSwitchMaster.msg
 	TecsStatus.msg
 	TelemetryStatus.msg
 	TiltrotorExtraControls.msg

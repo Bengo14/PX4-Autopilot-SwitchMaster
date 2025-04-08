@@ -541,6 +541,84 @@ parameters:
                 1: Remove first failed motor from effectiveness
             default: 0
 
+    - group: SM MANEUVERS
+      definitions:
+        # Switch Master
+        FW_MAN_PERIOD:
+          description:
+            short: Switch Master maneuver time period.
+            long: Switch Master maneuver time period, for doublets it is the half period, for 3-2-1-1 it is the time unit.
+          type: float
+          decimal: 1
+          increment: 0.1
+          min: 0.1
+          max: 2.0
+          unit: s
+          default: 0.5
+        FW_MAN_DURATION:
+          description:
+            short: Total time of Switch Master maneuver
+            long: Total time of Switch Master maneuver in seconds. MUST be coherent with period and type.
+          type: float
+          decimal: 1
+          increment: 0.1
+          min: 2.0
+          max: 10.0
+          unit: s
+          default: 6.0
+        FW_MAN_AMPLITUDE:
+          description:
+            short: Amplitude of Switch Master maneuver
+            long: Amplitude of Switch Master maneuver, actuator delta value normalized between -1 and 1.
+          type: float
+          decimal: 2
+          increment: 0.01
+          min: -1.0
+          max: 1.0
+          default: 0.1
+        FW_MAN_TEST:
+          description:
+            short: Test the selected maneuver
+            long: When this parameter is switched from 0 to 1, the selected maneuver is tested on the actuators.
+                  The Switch Master must be disarmed, otherwise it has no effect.
+          type: boolean
+          default: 0
+        FW_MAN_TEST_IDX:
+          description:
+            short: Select the maneuver to be tested.
+          type: enum
+          values:
+              0: pitch doublet
+              1: roll doublet
+              2: yaw doublet
+              3: pitch 3-2-1-1
+              4: roll 3-2-1-1
+              5: yaw 3-2-1-1
+              6: roll + yaw doublet
+              7: roll + yaw 3-2-1-1
+              8: roll + free response + yaw + free response
+          default: 0
+        ACT_MAX_RATE:
+          description:
+            short: Max rate of elevator in units/s.
+          type: float
+          decimal: 1
+          increment: 0.1
+          min: 0.1
+          max: 10.0
+          unit: 1/s
+          default: 1.0
+        FW_MAN_DELAY:
+          description:
+            short: Delay before the maneuver starts, in seconds, while actuators are blocked.
+          type: float
+          decimal: 1
+          increment: 0.1
+          min: 0.0
+          max: 2.0
+          unit: s
+          default: 0.5
+
 # Mixer
 mixer:
     actuator_types:

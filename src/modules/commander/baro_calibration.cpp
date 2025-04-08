@@ -145,9 +145,9 @@ int do_baro_calibration(orb_advert_t *mavlink_log_pub)
 		if ((calibration[instance].device_id() != 0) && (data_sum_count[instance] > 0)) {
 
 			const float pressure_pa = data_sum[instance] / data_sum_count[instance];
-			const float temperature = temperature_sum[instance] / data_sum_count[instance];
+			//const float temperature = temperature_sum[instance] / data_sum_count[instance];
 
-			float pressure_altitude = getAltitudeFromPressure(pressure_pa, temperature);
+			float pressure_altitude = getAltitudeFromPressure(pressure_pa, 101300.0f);
 
 			// Use GPS altitude as a reference to compute the baro bias measurement
 			const float baro_bias = pressure_altitude - gps_altitude;
@@ -164,7 +164,7 @@ int do_baro_calibration(orb_advert_t *mavlink_log_pub)
 			// perform a binary search
 			while (front <= last) {
 				middle = front + (last - front) / 2;
-				float altitude_calibrated = getAltitudeFromPressure(pressure_pa - middle, temperature);
+				float altitude_calibrated = getAltitudeFromPressure(pressure_pa - middle, 101300.0f);
 
 				if (altitude_calibrated > altitude + 0.1f) {
 					last = middle;

@@ -52,6 +52,7 @@ ActuatorEffectivenessFixedWing::getEffectivenessMatrix(Configuration &configurat
 
 	// Motors
 	_rotors.enablePropellerTorque(false);
+	_rotors.enableYawByDifferentialThrust(false); // added for Switch Master simulation
 	const bool rotors_added_successfully = _rotors.addActuators(configuration);
 	_forwards_motors_mask = _rotors.getForwardsMotors();
 

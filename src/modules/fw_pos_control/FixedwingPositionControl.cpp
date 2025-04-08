@@ -259,6 +259,8 @@ FixedwingPositionControl::wind_poll()
 		_wind_valid = _wind_valid && (hrt_absolute_time() - _time_wind_last_received) < WIND_EST_TIMEOUT;
 	}
 
+	_wind_valid = false; // disable wind estimation for Switch Master
+
 	if (!_wind_valid) {
 		_wind_vel(0) = 0.f;
 		_wind_vel(1) = 0.f;
@@ -274,7 +276,7 @@ FixedwingPositionControl::manual_control_setpoint_poll()
 	_manual_control_setpoint_for_airspeed = _manual_control_setpoint.throttle;
 
 	if (_param_fw_pos_stk_conf.get() & STICK_CONFIG_SWAP_STICKS_BIT) {
-		/* Alternate stick allocation (similar concept as for multirotor systems:
+		/* Alternate stick allocation (similar concept as for multirotor systems):
 		 * demanding up/down with the throttle stick, and move faster/break with the pitch one.
 		 */
 		_manual_control_setpoint_for_height_rate = -_manual_control_setpoint.throttle;
@@ -316,6 +318,14 @@ FixedwingPositionControl::vehicle_attitude_poll()
 		const Eulerf euler_angles(R);
 		_pitch = euler_angles(1);
 		_yaw = euler_angles(2);
+
+		// Switch Master attitude safety controls during a maneuver
+		if (_maneuver_started && (_pitch > radians(60.0f) || _pitch < radians(-45.0f))) {
+			abort_maneuver(ABORT_REASON::ATTITUDE_PITCH);
+		}
+		else if (_maneuver_started && fabsf(euler_angles(0)) > radians(45.0f)) {
+			abort_maneuver(ABORT_REASON::ATTITUDE_ROLL);
+		}
 
 		Vector3f body_acceleration = R.transpose() * Vector3f{_local_pos.ax, _local_pos.ay, _local_pos.az};
 		_body_acceleration_x = body_acceleration(0);
@@ -1055,41 +1065,6 @@ FixedwingPositionControl::control_auto_position(const float control_interval, co
 		tecs_fw_thr_max = _param_fw_thr_max.get();
 	}
 
-	// waypoint is a plain navigation waypoint
-	float position_sp_alt = pos_sp_curr.alt;
-
-	// Altitude first order hold (FOH)
-	if (_position_setpoint_previous_valid &&
-	    ((pos_sp_prev.type == position_setpoint_s::SETPOINT_TYPE_POSITION) ||
-	     (pos_sp_prev.type == position_setpoint_s::SETPOINT_TYPE_LOITER))
-	   ) {
-		const float d_curr_prev = get_distance_to_next_waypoint(pos_sp_curr.lat, pos_sp_curr.lon, pos_sp_prev.lat,
-					  pos_sp_prev.lon);
-
-		// Do not try to find a solution if the last waypoint is inside the acceptance radius of the current one
-		if (d_curr_prev > math::max(acc_rad, fabsf(pos_sp_curr.loiter_radius))) {
-			// Calculate distance to current waypoint
-			const float d_curr = get_distance_to_next_waypoint(pos_sp_curr.lat, pos_sp_curr.lon, _current_latitude,
-					     _current_longitude);
-
-			// Save distance to waypoint if it is the smallest ever achieved, however make sure that
-			// _min_current_sp_distance_xy is never larger than the distance between the current and the previous wp
-			_min_current_sp_distance_xy = math::min(d_curr, _min_current_sp_distance_xy, d_curr_prev);
-
-			// if the minimal distance is smaller than the acceptance radius, we should be at waypoint alt
-			// navigator will soon switch to the next waypoint item (if there is one) as soon as we reach this altitude
-			if (_min_current_sp_distance_xy > math::max(acc_rad, fabsf(pos_sp_curr.loiter_radius))) {
-				// The setpoint is set linearly and such that the system reaches the current altitude at the acceptance
-				// radius around the current waypoint
-				const float delta_alt = (pos_sp_curr.alt - pos_sp_prev.alt);
-				const float grad = -delta_alt / (d_curr_prev - math::max(acc_rad, fabsf(pos_sp_curr.loiter_radius)));
-				const float a = pos_sp_prev.alt - grad * d_curr_prev;
-
-				position_sp_alt = a + grad * _min_current_sp_distance_xy;
-			}
-		}
-	}
-
 	float target_airspeed = adapt_airspeed_setpoint(control_interval, pos_sp_curr.cruising_speed,
 				_performance_model.getMinimumCalibratedAirspeed(getLoadFactor()), ground_speed);
 
@@ -1110,17 +1085,247 @@ FixedwingPositionControl::control_auto_position(const float control_interval, co
 	_att_sp.roll_body = getCorrectedNpfgRollSetpoint();
 	target_airspeed = _npfg.getAirspeedRef() / _eas2tas;
 
+
 	_att_sp.yaw_body = _yaw; // yaw is not controlled, so set setpoint to current yaw
 
+	// waypoint is a plain navigation waypoint
+	_pos_sp_alt = pos_sp_curr.alt;
+	_prev_pos_sp_alt = pos_sp_prev.alt;
+	_height_rate_sp = NAN;
+	float min_wp_delta_dist = _param_min_wp_dist_gamma_sp.get(); // Switch Master gamma mode activation condition
+	float dist = get_distance_to_next_waypoint(pos_sp_prev.lat, pos_sp_prev.lon, pos_sp_curr.lat, pos_sp_curr.lon);
+	float target_tas = target_airspeed * _eas2tas;
+
+
+	if (_position_setpoint_previous_valid &&
+	    ((pos_sp_prev.type == position_setpoint_s::SETPOINT_TYPE_POSITION) ||
+	     (pos_sp_prev.type == position_setpoint_s::SETPOINT_TYPE_LOITER))
+	   ){
+		// ----- Switch Master project, FPA setpoint and glide mode modification, DAER Polimi -----
+
+		if (dist >= min_wp_delta_dist && (_pos_sp_alt - _prev_pos_sp_alt) >= 0) { // climb mode with gamma sp
+
+			if (_glide_mode_enabled) {
+				enable_glide_mode(false);
+			}
+			if (!_gamma_evaluated) {
+				evaluate_gamma_and_start_time(true);
+			}
+
+			_height_rate_sp = target_tas * _sin_gamma; // fixed gamma setpoint to height rate setpoint
+
+			safety_checks_maneuver_and_glide();
+
+			if (!_maneuver_started && !isZero(_airspeed_eas) && _param_man_enabled.get() && !_master_alarm) {
+
+				float sin_gamma_error = fabsf(_sin_gamma - (-_local_pos.vz / (_airspeed_eas * _eas2tas)));
+				float tas_error = fabsf(target_tas - (_airspeed_eas * _eas2tas));
+				float trim_time = (hrt_absolute_time() - _start_time) / 1e6f; //[s]
+				float conditions_hold_time = (hrt_absolute_time() - _trim_clock) / 1e6f; //[s]
+
+				// we can approximate sin(gamma_error) to gamma_error, since the error is small
+				if (sin_gamma_error < radians(_param_man_gamma_err.get()) && tas_error < _param_man_vel_err.get() && trim_time >= _param_man_min_time.get()) {
+
+					if (conditions_hold_time >= _param_man_trim_time.get()) {
+						start_stop_maneuver(true);
+					}
+				} else {
+					_trim_clock = hrt_absolute_time();
+				}
+			}
+
+		} else if (dist >= min_wp_delta_dist && (_pos_sp_alt - _prev_pos_sp_alt) < 0) { // sink mode with gamma sp
+
+			if (!_gamma_evaluated) {
+				evaluate_gamma_and_start_time(false);
+			}
+
+			if (_sin_gamma < 0) {
+			// we are in glide mode
+			// height rate setpoint remains NAN and we have h setpoint equal to the altitude of the next wp
+
+				safety_checks_maneuver_and_glide();
+
+				if (!_glide_mode_enabled && _current_altitude >= _pos_sp_alt + 20.0f && _airspeed_eas * _eas2tas >= 10.0f && !_master_alarm) {
+					enable_glide_mode(true);
+				}
+
+				if (!_maneuver_started && !isZero(_airspeed_eas) && _glide_mode_enabled && _param_man_enabled.get() && !_master_alarm) {
+
+					float tas_error = fabsf(target_tas - (_airspeed_eas * _eas2tas));
+					float trim_time = (hrt_absolute_time() - _start_time) / 1e6f; //[s]
+					float conditions_hold_time = (hrt_absolute_time() - _trim_clock) / 1e6f; //[s]
+
+					if (tas_error < _param_man_vel_err.get() && trim_time >= _param_man_min_time.get()) {
+						if (conditions_hold_time >= _param_man_trim_time.get()) {
+							start_stop_maneuver(true);
+						}
+					} else {
+						_trim_clock = hrt_absolute_time();
+					}
+				}
+
+			} else {
+				if (_glide_mode_enabled) {
+					enable_glide_mode(false);
+				}
+
+				_height_rate_sp = - target_tas * _sin_gamma; // fixed gamma setpoint to height rate setpoint
+
+				safety_checks_maneuver_and_glide();
+
+				if (!_maneuver_started && !isZero(_airspeed_eas) && _param_man_enabled.get() && !_master_alarm) {
+
+					float sin_gamma_error = fabsf(_sin_gamma + (-_local_pos.vz / (_airspeed_eas * _eas2tas)));
+					float tas_error = fabsf(target_tas - (_airspeed_eas * _eas2tas));
+					float trim_time = (hrt_absolute_time() - _start_time) / 1e6f; //[s]
+					float conditions_hold_time = (hrt_absolute_time() - _trim_clock) / 1e6f; //[s]
+
+					// we can approximate sin(gamma_error) to gamma_error, since the angle is small
+					if (sin_gamma_error < radians(_param_man_gamma_err.get()) && tas_error < _param_man_vel_err.get() && trim_time >= _param_man_min_time.get()) {
+
+						if (conditions_hold_time >= _param_man_trim_time.get()) {
+							start_stop_maneuver(true);
+						}
+					} else {
+						_trim_clock = hrt_absolute_time();
+					}
+				}
+			}
+
+		} else { // Altitude first order hold (FOH)
+
+			_gamma_evaluated = false;
+			if (_maneuver_started) {
+				abort_maneuver(ABORT_REASON::HORIZONTAL_LIMIT);
+			}
+			if (_glide_mode_enabled) {
+				enable_glide_mode(false);
+			}
+			_master_alarm = false;
+
+			//-----------------------------------------------------------------------------------------------------------
+
+			const float d_curr_prev = get_distance_to_next_waypoint(pos_sp_curr.lat, pos_sp_curr.lon, pos_sp_prev.lat,
+					  pos_sp_prev.lon);
+
+			// Do not try to find a solution if the last waypoint is inside the acceptance radius of the current one
+			if (d_curr_prev > math::max(acc_rad, fabsf(pos_sp_curr.loiter_radius))) {
+				// Calculate distance to current waypoint
+				const float d_curr = get_distance_to_next_waypoint(pos_sp_curr.lat, pos_sp_curr.lon, _current_latitude,
+						_current_longitude);
+
+				// Save distance to waypoint if it is the smallest ever achieved, however make sure that
+				// _min_current_sp_distance_xy is never larger than the distance between the current and the previous wp
+				_min_current_sp_distance_xy = math::min(d_curr, _min_current_sp_distance_xy, d_curr_prev);
+
+				// if the minimal distance is smaller than the acceptance radius, we should be at waypoint alt
+				// navigator will soon switch to the next waypoint item (if there is one) as soon as we reach this altitude
+				if (_min_current_sp_distance_xy > math::max(acc_rad, fabsf(pos_sp_curr.loiter_radius))) {
+
+					// The setpoint is set linearly
+					const float delta_alt = (pos_sp_curr.alt - pos_sp_prev.alt);
+					//const float grad = -delta_alt / (d_curr_prev - math::max(acc_rad, fabsf(pos_sp_curr.loiter_radius)));
+					const float grad = -delta_alt / (d_curr_prev - math::max(0.0f , fabsf(pos_sp_curr.loiter_radius)));
+					const float a = pos_sp_prev.alt - grad * d_curr_prev;
+
+					// altitude setpoint ranges linearly from pos_sp_prev.alt (at d_curr_prev dist) to pos_sp_curr.alt (at acc_rad dist)
+					_pos_sp_alt = a + grad * _min_current_sp_distance_xy;
+				}
+			}
+		}
+	}
+
 	tecs_update_pitch_throttle(control_interval,
-				   position_sp_alt,
+				   _pos_sp_alt,
 				   target_airspeed,
 				   radians(_param_fw_p_lim_min.get()),
 				   radians(_param_fw_p_lim_max.get()),
 				   tecs_fw_thr_min,
 				   tecs_fw_thr_max,
 				   _param_sinkrate_target.get(),
-				   _param_climbrate_target.get());
+				   _param_climbrate_target.get(),
+				   false,
+				   _height_rate_sp);
+}
+
+void
+FixedwingPositionControl::evaluate_gamma_and_start_time(bool climb_mode) {
+
+	int index = _counter / 2;
+	char buffer[17];
+
+	if (climb_mode) {
+		sprintf(buffer, "FW_GAMMA%u_CLIMB", index + 1);
+	} else {
+		sprintf(buffer, "FW_GAMMA%u_SINK", index + 1);
+	}
+	param_t param = param_find(buffer);
+	float gamma_sp;
+	param_get(param, &gamma_sp);
+	_counter++;
+	_counter %= MAX_NUM_GAMMA;
+
+	if (climb_mode) {
+		gamma_sp = fabsf(gamma_sp);
+		PX4_INFO("Gamma setpoint: %.1f", (double) gamma_sp);
+	} else if (gamma_sp >= 0) {
+		PX4_INFO("Gamma setpoint: %.1f", (double) -gamma_sp);
+	}
+	_sin_gamma = sinf(radians(gamma_sp));
+	_gamma_evaluated = true;
+	_start_time = hrt_absolute_time();
+	_trim_clock = hrt_absolute_time();
+}
+
+void
+FixedwingPositionControl::enable_glide_mode(bool enable) {
+
+	_glide_mode_enabled = enable;
+	glide_mode_switch_master_s glide_mode_switch_master;
+	glide_mode_switch_master.timestamp = hrt_absolute_time();
+	glide_mode_switch_master.glide_enabled = enable;
+	_glide_mode_switch_master_pub.publish(glide_mode_switch_master);
+}
+
+void
+FixedwingPositionControl::start_stop_maneuver(bool start, uint8_t reason) {
+
+	_maneuver_started = start;
+	do_maneuver_switch_master_s do_maneuver_switch_master;
+	do_maneuver_switch_master.maneuver_index = _param_man_type.get();
+	do_maneuver_switch_master.enabled = start;
+	do_maneuver_switch_master.reason = reason;
+	do_maneuver_switch_master.timestamp = hrt_absolute_time();
+	_do_maneuver_switch_master_pub.publish(do_maneuver_switch_master);
+}
+
+void
+FixedwingPositionControl::safety_checks_maneuver_and_glide() {
+
+	if (_maneuver_started && !_param_man_enabled.get()) {
+		abort_maneuver(ABORT_REASON::KILL_SWITCH);
+	}
+	if (_glide_mode_enabled && (_current_altitude < _pos_sp_alt + 10.0f || _eas2tas * _airspeed_eas < 10.0f || -_local_pos.vz < -10.0f || _current_altitude < 30.0f)) {
+		enable_glide_mode(false);
+		abort_maneuver(ABORT_REASON::ALTITUDE_OR_SPEED);
+	}
+	else if (_maneuver_started && (_pos_sp_alt - _prev_pos_sp_alt) > 0.0f && (_current_altitude >= (_pos_sp_alt - _height_rate_sp * 2.f) || _eas2tas * _airspeed_eas < 10.0f || _current_altitude < 30.0f)) {
+		abort_maneuver(ABORT_REASON::ALTITUDE_OR_SPEED);
+	}
+	else if (_maneuver_started && (_pos_sp_alt - _prev_pos_sp_alt) < 0.0f && !_glide_mode_enabled && (_current_altitude <= (_pos_sp_alt - _height_rate_sp * 2.f) || _eas2tas * _airspeed_eas < 10.0f || _current_altitude < 30.0f)) {
+		abort_maneuver(ABORT_REASON::ALTITUDE_OR_SPEED);
+	}
+	else if (_maneuver_started && isZero(_pos_sp_alt - _prev_pos_sp_alt) && (_current_altitude < (_pos_sp_alt - 5.0f) || _eas2tas * _airspeed_eas < 10.0f || _current_altitude < 20.0f)) {
+		abort_maneuver(ABORT_REASON::ALTITUDE_OR_SPEED);
+	}
+}
+
+void
+FixedwingPositionControl::abort_maneuver(uint8_t reason) {
+	start_stop_maneuver(false, reason);
+	_master_alarm = true;
+	PX4_WARN("Conditions for potential maneuver abort reached");
 }
 
 void
@@ -1503,7 +1708,7 @@ FixedwingPositionControl::control_auto_takeoff(const hrt_abstime &now, const flo
 		_att_sp.yaw_body = _runway_takeoff.getYaw(bearing);
 
 		// update tecs
-		const float pitch_max = _runway_takeoff.getMaxPitch(math::radians(_param_fw_p_lim_max.get()));
+		const float pitch_max = _runway_takeoff.getMaxPitch(math::radians(_param_fw_p_lim_max.get() - 10)); // reduce pitch in climb-out (Switch Master)
 		const float pitch_min = _runway_takeoff.getMinPitch(math::radians(_takeoff_pitch_min.get()),
 					math::radians(_param_fw_p_lim_min.get()));
 
@@ -2540,6 +2745,11 @@ FixedwingPositionControl::Run()
 
 		case FW_POSCTRL_MODE_OTHER: {
 				_att_sp.thrust_body[0] = min(_att_sp.thrust_body[0], _param_fw_thr_max.get());
+
+				// Switch Master maneuver aborting in manual mode
+				if (_maneuver_started) {
+					abort_maneuver(ABORT_REASON::MANUAL_MODE);
+				}
 				break;
 			}
 

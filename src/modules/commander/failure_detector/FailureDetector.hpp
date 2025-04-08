@@ -83,15 +83,17 @@ using uORB::SubscriptionData;
 class FailureInjector
 {
 public:
-	void update();
+	void update(uint32_t failed_motors_bitmask);
 
 	void manipulateEscStatus(esc_status_s &status);
+
 private:
 	uORB::Subscription _vehicle_command_sub{ORB_ID(vehicle_command)};
 	uORB::Publication<vehicle_command_ack_s> _command_ack_pub{ORB_ID(vehicle_command_ack)};
 
 	uint32_t _esc_blocked{};
 	uint32_t _esc_wrong{};
+	uint8_t _prev_motor_failure_injection_mask{0}; // Switch Master failure injection
 };
 
 class FailureDetector : public ModuleParams
@@ -104,7 +106,7 @@ public:
 	const failure_detector_status_u &getStatus() const { return _status; }
 	const decltype(failure_detector_status_u::flags) &getStatusFlags() const { return _status.flags; }
 	float getImbalancedPropMetric() const { return _imbalanced_prop_lpf.getState(); }
-	uint16_t getMotorFailures() const { return _motor_failure_esc_timed_out_mask | _motor_failure_esc_under_current_mask; }
+	uint16_t getMotorFailures() const { return _motor_failure_esc_timed_out_mask | _motor_failure_esc_under_current_mask | _motor_failure_injection_mask;}
 
 private:
 	void updateAttitudeStatus(const vehicle_status_s &vehicle_status);
@@ -129,7 +131,8 @@ private:
 	uint8_t _motor_failure_esc_valid_current_mask{};  // ESC 1-8, true if ESC telemetry was valid at some point
 	uint8_t _motor_failure_esc_timed_out_mask{};      // ESC telemetry no longer available -> failure
 	uint8_t _motor_failure_esc_under_current_mask{};  // ESC drawing too little current -> failure
-	bool _motor_failure_esc_has_current[actuator_motors_s::NUM_CONTROLS] {false}; // true if some ESC had non-zero current (some don't support it)
+	uint8_t _motor_failure_injection_mask{0}; // Switch Master failure injection feature
+	bool _motor_failure_escs_have_current{false}; // true if some ESC had non-zero current (some don't support it)
 	hrt_abstime _motor_failure_undercurrent_start_time[actuator_motors_s::NUM_CONTROLS] {};
 
 	uORB::Subscription _vehicle_attitude_sub{ORB_ID(vehicle_attitude)};
@@ -155,6 +158,7 @@ private:
 		(ParamBool<px4::params::FD_ACT_EN>) _param_fd_actuator_en,
 		(ParamFloat<px4::params::FD_ACT_MOT_THR>) _param_fd_motor_throttle_thres,
 		(ParamFloat<px4::params::FD_ACT_MOT_C2T>) _param_fd_motor_current2throttle_thres,
-		(ParamInt<px4::params::FD_ACT_MOT_TOUT>) _param_fd_motor_time_thres
+		(ParamInt<px4::params::FD_ACT_MOT_TOUT>) _param_fd_motor_time_thres,
+		(ParamInt<px4::params::FD_MOT_FAIL_INJ>) _param_fd_motor_failure_injection
 	)
 };

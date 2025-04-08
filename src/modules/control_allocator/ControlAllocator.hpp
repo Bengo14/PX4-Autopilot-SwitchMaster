@@ -70,6 +70,8 @@
 #include <uORB/SubscriptionCallback.hpp>
 #include <uORB/topics/actuator_motors.h>
 #include <uORB/topics/actuator_servos.h>
+#include <uORB/topics/do_maneuver_switch_master.h>
+#include <uORB/topics/auto_control_stand_by_mode_switch_master.h>
 #include <uORB/topics/actuator_servos_trim.h>
 #include <uORB/topics/control_allocator_status.h>
 #include <uORB/topics/parameter_update.h>
@@ -136,7 +138,9 @@ private:
 
 	void publish_control_allocator_status(int matrix_index);
 
-	void publish_actuator_controls();
+	void publish_actuator_controls(bool exec_maneuver = false, float roll = 0.0f, float pitch = 0.0f, float yaw = 0.0f);
+
+	void end_maneuver();
 
 	AllocationMethod _allocation_method_id{AllocationMethod::NONE};
 	ControlAllocation *_control_allocation[ActuatorEffectiveness::MAX_NUM_MATRICES] {}; 	///< class for control allocation calculations
@@ -178,6 +182,14 @@ private:
 	uORB::Subscription _vehicle_torque_setpoint1_sub{ORB_ID(vehicle_torque_setpoint), 1};  /**< vehicle torque setpoint subscription (2. instance) */
 	uORB::Subscription _vehicle_thrust_setpoint1_sub{ORB_ID(vehicle_thrust_setpoint), 1};	 /**< vehicle thrust setpoint subscription (2. instance) */
 
+	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
+
+	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
+	uORB::Subscription _vehicle_control_mode_sub{ORB_ID(vehicle_control_mode)};
+	uORB::Subscription _failure_detector_status_sub{ORB_ID(failure_detector_status)};
+
+	uORB::Subscription _do_maneuver_switch_master_sub{ORB_ID(do_maneuver_switch_master)}; // Switch Master maneuver trigger message
+
 	// Outputs
 	uORB::PublicationMulti<control_allocator_status_s> _control_allocator_status_pub[2] {ORB_ID(control_allocator_status), ORB_ID(control_allocator_status)};
 
@@ -185,11 +197,8 @@ private:
 	uORB::Publication<actuator_servos_s>	_actuator_servos_pub{ORB_ID(actuator_servos)};
 	uORB::Publication<actuator_servos_trim_s>	_actuator_servos_trim_pub{ORB_ID(actuator_servos_trim)};
 
-	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
-
-	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
-	uORB::Subscription _vehicle_control_mode_sub{ORB_ID(vehicle_control_mode)};
-	uORB::Subscription _failure_detector_status_sub{ORB_ID(failure_detector_status)};
+	uORB::Publication<do_maneuver_switch_master_s> _do_maneuver_switch_master_pub{ORB_ID(do_maneuver_switch_master)}; // Switch Master maneuver trigger message
+	uORB::Publication<auto_control_stand_by_mode_switch_master_s> _auto_control_stand_by_mode_switch_master_pub{ORB_ID(auto_control_stand_by_mode_switch_master)};
 
 	matrix::Vector3f _torque_sp;
 	matrix::Vector3f _thrust_sp;
@@ -210,11 +219,39 @@ private:
 	Params _params{};
 	bool _has_slew_rate{false};
 
+	// Switch Master maneuver parameters
+	static const int WINDOW_SIZE = 200; // size of the arrays to store samples for actuators offset computation
+	hrt_abstime _man_starting_time{0};
+	hrt_abstime _prev_time{0};
+	uint8_t _maneuver_index{0};
+	float _servos_last_update[MAX_NUM_SERVOS];
+	float _actuators_latest_samples[MAX_NUM_SERVOS][WINDOW_SIZE];
+	float _motors_latest_samples[MAX_NUM_MOTORS][WINDOW_SIZE];
+	int _counter{-1};
+	bool _offset_computed_e{false};
+	bool _offset_computed_a{false};
+	bool _offset_computed_r{false};
+	bool _offset_computed_motors{false};
+	float _offset_e{0.0f};
+	float _offset_a{0.0f};
+	float _offset_r{0.0f};
+	float _offset_motors[MAX_NUM_MOTORS];
+	float _man_period, _man_duration, _man_amplitude, _man_delay;
+	bool _man_test_switch_state{false};
+	bool _man_enabled{false};
+
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::CA_AIRFRAME>) _param_ca_airframe,
 		(ParamInt<px4::params::CA_METHOD>) _param_ca_method,
 		(ParamInt<px4::params::CA_FAILURE_MODE>) _param_ca_failure_mode,
-		(ParamInt<px4::params::CA_R_REV>) _param_r_rev
+		(ParamInt<px4::params::CA_R_REV>) _param_r_rev,
+		(ParamFloat<px4::params::FW_MAN_PERIOD>) _param_man_period,
+		(ParamFloat<px4::params::FW_MAN_DURATION>) _param_man_duration,
+		(ParamFloat<px4::params::FW_MAN_AMPLITUDE>) _param_man_amplitude,
+		(ParamInt<px4::params::FW_MAN_TEST>) _param_man_test,
+		(ParamInt<px4::params::FW_MAN_TEST_IDX>) _param_man_test_idx,
+		(ParamFloat<px4::params::FW_MAN_DELAY>) _param_man_delay,
+		(ParamFloat<px4::params::ACT_MAX_RATE>) _param_act_max_rate
 	)
 
 };

@@ -97,6 +97,8 @@
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/wind.h>
 #include <uORB/topics/orbit_status.h>
+#include <uORB/topics/do_maneuver_switch_master.h>
+#include <uORB/topics/glide_mode_switch_master.h>
 #include <uORB/uORB.h>
 
 #ifdef CONFIG_FIGURE_OF_EIGHT
@@ -227,6 +229,8 @@ private:
 	uORB::Publication<normalized_unsigned_setpoint_s> _flaps_setpoint_pub{ORB_ID(flaps_setpoint)};
 	uORB::Publication<normalized_unsigned_setpoint_s> _spoilers_setpoint_pub{ORB_ID(spoilers_setpoint)};
 	uORB::PublicationData<flight_phase_estimation_s> _flight_phase_estimation_pub{ORB_ID(flight_phase_estimation)};
+	uORB::Publication<do_maneuver_switch_master_s> _do_maneuver_switch_master_pub{ORB_ID(do_maneuver_switch_master)};
+	uORB::Publication<glide_mode_switch_master_s> _glide_mode_switch_master_pub{ORB_ID(glide_mode_switch_master)};
 
 	manual_control_setpoint_s _manual_control_setpoint{};
 	position_setpoint_triplet_s _pos_sp_triplet{};
@@ -286,6 +290,29 @@ private:
 	float _reference_altitude{NAN}; // [m AMSL] altitude of the local projection reference point
 
 	bool _landed{true};
+
+	// Switch Master project parameters
+	bool _maneuver_started{false};
+	bool _gamma_evaluated{false};
+	bool _glide_mode_enabled{false};
+	float _height_rate_sp;
+	float _sin_gamma{0};
+	float _pos_sp_alt;
+	float _prev_pos_sp_alt;
+	hrt_abstime _start_time;
+	hrt_abstime _trim_clock;
+	int _counter{0};
+	bool _master_alarm{false};
+	const int MAX_NUM_GAMMA{12};
+
+	enum ABORT_REASON {
+		KILL_SWITCH,
+		ALTITUDE_OR_SPEED,
+		ATTITUDE_PITCH,
+		ATTITUDE_ROLL,
+		MANUAL_MODE,
+		HORIZONTAL_LIMIT
+	};
 
 	// MANUAL MODES
 
@@ -606,6 +633,16 @@ private:
 	 */
 	void control_auto_position(const float control_interval, const Vector2d &curr_pos, const Vector2f &ground_speed,
 				   const position_setpoint_s &pos_sp_prev, const position_setpoint_s &pos_sp_curr);
+
+	void evaluate_gamma_and_start_time(bool climb_mode);
+
+	void enable_glide_mode(bool enabled);
+
+	void start_stop_maneuver(bool start, uint8_t reason = 0);
+
+	void safety_checks_maneuver_and_glide();
+
+	void abort_maneuver(uint8_t reason);
 
 	/**
 	 * @brief Vehicle control for loiter waypoints.
@@ -980,6 +1017,27 @@ private:
 		(ParamFloat<px4::params::FW_T_SPD_STD>) _param_speed_standard_dev,
 		(ParamFloat<px4::params::FW_T_SPD_DEV_STD>) _param_speed_rate_standard_dev,
 		(ParamFloat<px4::params::FW_T_SPD_PRC_STD>) _param_process_noise_standard_dev,
+
+		// Switch Master parameters
+		(ParamFloat<px4::params::FW_GAMMA1_CLIMB>) _param_gamma1_climb,
+		(ParamFloat<px4::params::FW_GAMMA1_SINK>) _param_gamma1_sink,
+		(ParamFloat<px4::params::FW_GAMMA2_CLIMB>) _param_gamma2_climb,
+		(ParamFloat<px4::params::FW_GAMMA2_SINK>) _param_gamma2_sink,
+		(ParamFloat<px4::params::FW_GAMMA3_CLIMB>) _param_gamma3_climb,
+		(ParamFloat<px4::params::FW_GAMMA3_SINK>) _param_gamma3_sink,
+		(ParamFloat<px4::params::FW_GAMMA4_CLIMB>) _param_gamma4_climb,
+		(ParamFloat<px4::params::FW_GAMMA4_SINK>) _param_gamma4_sink,
+		(ParamFloat<px4::params::FW_GAMMA5_CLIMB>) _param_gamma5_climb,
+		(ParamFloat<px4::params::FW_GAMMA5_SINK>) _param_gamma5_sink,
+		(ParamFloat<px4::params::FW_GAMMA6_CLIMB>) _param_gamma6_climb,
+		(ParamFloat<px4::params::FW_GAMMA6_SINK>) _param_gamma6_sink,
+		(ParamFloat<px4::params::FW_MIN_WP_DIST>) _param_min_wp_dist_gamma_sp,
+		(ParamInt<px4::params::FW_MAN_TYPE>) _param_man_type,
+		(ParamFloat<px4::params::FW_MAN_VEL_ERR>) _param_man_vel_err,
+		(ParamFloat<px4::params::FW_MAN_GAMMA_ERR>) _param_man_gamma_err,
+		(ParamFloat<px4::params::FW_MAN_MIN_TIME>) _param_man_min_time,
+		(ParamInt<px4::params::FW_MAN_EN>) _param_man_enabled,
+		(ParamFloat<px4::params::FW_MAN_TRIM_TIME>) _param_man_trim_time,
 
 		(ParamFloat<px4::params::FW_THR_IDLE>) _param_fw_thr_idle,
 		(ParamFloat<px4::params::FW_THR_MAX>) _param_fw_thr_max,

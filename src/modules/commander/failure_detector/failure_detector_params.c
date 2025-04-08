@@ -212,3 +212,21 @@ PARAM_DEFINE_FLOAT(FD_ACT_MOT_C2T, 2.0f);
  * @increment 100
  */
 PARAM_DEFINE_INT32(FD_ACT_MOT_TOUT, 100);
+
+/**
+ * Motor Failure Injection bitmask
+ *
+ * Used for Switch Master Project, failure injection on motors from parameters.
+ *
+ * @group Failure Detector
+ * @min 0
+ * @max 63
+ * @bit 0 motor 1
+ * @bit 1 motor 2
+ * @bit 2 motor 3
+ * @bit 3 motor 4
+ * @bit 4 motor 5
+ * @bit 5 motor 6
+ *
+ */
+PARAM_DEFINE_INT32(FD_MOT_FAIL_INJ, 0);

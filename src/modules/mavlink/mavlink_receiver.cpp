@@ -2384,11 +2384,12 @@ MavlinkReceiver::handle_message_hil_gps(mavlink_message_t *msg)
 	gps.c_variance_rad = 0.5f;
 	gps.fix_type = hil_gps.fix_type;
 
-	gps.eph = (float)hil_gps.eph * 1e-2f; // cm -> m
-	gps.epv = (float)hil_gps.epv * 1e-2f; // cm -> m
-
-	gps.hdop = 0; // TODO
-	gps.vdop = 0; // TODO
+	gps.eph = (float)hil_gps.eph;
+	gps.hdop = gps.eph;
+	gps.eph /= 100.0f; // cm -> m
+	gps.epv = (float)hil_gps.epv;
+	gps.vdop = gps.epv;
+	gps.epv /= 100.0f; // cm -> m
 
 	gps.noise_per_ms = 0;
 	gps.automatic_gain_control = 0;

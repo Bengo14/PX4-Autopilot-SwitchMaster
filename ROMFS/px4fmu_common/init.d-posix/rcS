@@ -236,6 +236,7 @@ dataman start
 # only start the simulator if not in replay mode, as both control the lockstep time
 if ! replay tryapplyparams
 then
+	export PX4_SIM_HOST_ADDR=172.31.128.1
 	. px4-rc.simulator
 fi
 

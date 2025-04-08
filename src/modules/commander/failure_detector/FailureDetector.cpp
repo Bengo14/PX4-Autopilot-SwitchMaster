@@ -42,9 +42,17 @@
 
 using namespace time_literals;
 
-void FailureInjector::update()
+void FailureInjector::update(uint32_t failed_motors_bitmask)
 {
 	vehicle_command_s vehicle_command;
+
+	if (failed_motors_bitmask != _prev_motor_failure_injection_mask) {
+		if (failed_motors_bitmask != _esc_blocked) {
+			PX4_INFO("NEW FAILURE MOTOR BITMASK FROM PARAMS: %u", (unsigned)failed_motors_bitmask);
+		}
+		_esc_blocked = failed_motors_bitmask;
+		_prev_motor_failure_injection_mask = failed_motors_bitmask;
+	}
 
 	while (_vehicle_command_sub.update(&vehicle_command)) {
 		if (vehicle_command.command != vehicle_command_s::VEHICLE_CMD_INJECT_FAILURE) {
@@ -74,6 +82,7 @@ void FailureInjector::update()
 						_esc_blocked &= ~(1 << i);
 						_esc_wrong &= ~(1 << i);
 					}
+					PX4_INFO("FAILED MOTOR BITMASK: %u", (unsigned)_esc_blocked);
 
 				} else if (instance >= 1 && instance <= esc_status_s::CONNECTED_ESC_MAX) {
 					supported = true;
@@ -81,6 +90,7 @@ void FailureInjector::update()
 					PX4_INFO("CMD_INJECT_FAILURE, motor %d ok", instance - 1);
 					_esc_blocked &= ~(1 << (instance - 1));
 					_esc_wrong &= ~(1 << (instance - 1));
+					PX4_INFO("FAILED MOTOR BITMASK: %u", (unsigned)_esc_blocked);
 				}
 			}
 
@@ -90,14 +100,24 @@ void FailureInjector::update()
 
 				// 0 to signal all
 				if (instance == 0) {
-					for (int i = 0; i < esc_status_s::CONNECTED_ESC_MAX; i++) {
-						PX4_INFO("CMD_INJECT_FAILURE, motor %d off", i);
-						_esc_blocked |= 1 << i;
+
+					// Switch Master failure injection override
+					if (failed_motors_bitmask != 0) {
+						_esc_blocked = failed_motors_bitmask;
+						PX4_INFO("NEW FAILURE MOTOR BITMASK FROM PARAMS: %u", (unsigned)failed_motors_bitmask);
+
+					} else {
+						for (int i = 0; i < esc_status_s::CONNECTED_ESC_MAX; i++) {
+							PX4_INFO("CMD_INJECT_FAILURE, motor %d off", i);
+							_esc_blocked |= 1 << i;
+						}
 					}
+					PX4_INFO("FAILED MOTOR BITMASK: %u", (unsigned)_esc_blocked);
 
 				} else if (instance >= 1 && instance <= esc_status_s::CONNECTED_ESC_MAX) {
 					PX4_INFO("CMD_INJECT_FAILURE, motor %d off", instance - 1);
 					_esc_blocked |= 1 << (instance - 1);
+					PX4_INFO("FAILED MOTOR BITMASK: %u", (unsigned)_esc_blocked);
 				}
 			}
 
@@ -129,6 +149,7 @@ void FailureInjector::update()
 			ack.timestamp = hrt_absolute_time();
 			_command_ack_pub.publish(ack);
 		}
+
 	}
 
 }
@@ -139,15 +160,19 @@ void FailureInjector::manipulateEscStatus(esc_status_s &status)
 		unsigned offline = 0;
 
 		for (int i = 0; i < status.esc_count; i++) {
-			const unsigned i_esc = status.esc[i].actuator_function - actuator_motors_s::ACTUATOR_FUNCTION_MOTOR1;
 
-			if (_esc_blocked & (1 << i_esc)) {
+			// unsigned i_esc = status.esc[i].actuator_function - actuator_motors_s::ACTUATOR_FUNCTION_MOTOR1;
+			// Switch Master:
+			// N.B. used index i instead of original i_esc, because for some reason status.esc[i].actuator_function was always 0,
+			// leading to (0 - 101) = -101, which in turn means a giant number (because i_esc is unsigned)...
+
+			if (_esc_blocked & (1 << i)) {
 				unsigned function = status.esc[i].actuator_function;
 				memset(&status.esc[i], 0, sizeof(status.esc[i]));
 				status.esc[i].actuator_function = function;
 				offline |= 1 << i;
 
-			} else if (_esc_wrong & (1 << i_esc)) {
+			} else if (_esc_wrong & (1 << i)) {
 				// Create wrong rerport for this motor by scaling key values up and down
 				status.esc[i].esc_voltage *= 0.1f;
 				status.esc[i].esc_current *= 0.1f;
@@ -155,7 +180,8 @@ void FailureInjector::manipulateEscStatus(esc_status_s &status)
 			}
 		}
 
-		status.esc_online_flags &= ~offline;
+		// default value of bitmask: 1 for each connected esc (the remaining bits are 0!)
+		status.esc_online_flags &= ~offline; // online = online & (not offline) [bitwise operations!]
 	}
 }
 
@@ -166,7 +192,8 @@ FailureDetector::FailureDetector(ModuleParams *parent) :
 
 bool FailureDetector::update(const vehicle_status_s &vehicle_status, const vehicle_control_mode_s &vehicle_control_mode)
 {
-	_failure_injector.update();
+	uint32_t failed_motors_bitmask = _param_fd_motor_failure_injection.get();
+	_failure_injector.update(failed_motors_bitmask);
 
 	failure_detector_status_u status_prev = _status;
 
@@ -188,7 +215,15 @@ bool FailureDetector::update(const vehicle_status_s &vehicle_status, const vehic
 	esc_status_s esc_status;
 
 	if (_esc_status_sub.update(&esc_status)) {
+
 		_failure_injector.manipulateEscStatus(esc_status);
+		_motor_failure_injection_mask = 0;
+
+		for (int i = 0; i < esc_status.esc_count; i++) { // Switch Master failure injection
+			if (~esc_status.esc_online_flags & (1 << i)) {
+				_motor_failure_injection_mask |= 1 << i;
+			}
+		}
 
 		if (_param_escs_en.get()) {
 			updateEscsStatus(vehicle_status, esc_status);
@@ -416,10 +451,10 @@ void FailureDetector::updateMotorStatus(const vehicle_status_s &vehicle_status, 
 
 			// Check if ESC current is too low
 			if (cur_esc_report.esc_current > FLT_EPSILON) {
-				_motor_failure_esc_has_current[i_esc] = true;
+				_motor_failure_escs_have_current = true;
 			}
 
-			if (_motor_failure_esc_has_current[i_esc]) {
+			if (_motor_failure_escs_have_current) {
 				float esc_throttle = 0.f;
 
 				if (PX4_ISFINITE(actuator_motors.control[i_esc])) {
@@ -451,7 +486,7 @@ void FailureDetector::updateMotorStatus(const vehicle_status_s &vehicle_status, 
 			}
 		}
 
-		bool critical_esc_failure = (_motor_failure_esc_timed_out_mask != 0 || _motor_failure_esc_under_current_mask != 0);
+		bool critical_esc_failure = (_motor_failure_esc_timed_out_mask != 0 || _motor_failure_esc_under_current_mask != 0 || _motor_failure_injection_mask != 0);
 
 		if (critical_esc_failure && !(_status.flags.motor)) {
 			// Add motor failure flag to bitfield

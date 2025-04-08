@@ -48,6 +48,7 @@
 using math::constrain;
 using math::max;
 using math::min;
+using math::radians;
 using namespace time_literals;
 
 static inline constexpr bool TIMESTAMP_VALID(float dt) { return (PX4_ISFINITE(dt) && dt > FLT_EPSILON);}
@@ -240,6 +241,7 @@ void TECSControl::initialize(const Setpoint &setpoint, const Input &input, Param
 	_detectUnderspeed(input, param, flag);
 
 	const SpecificEnergyWeighting weight{_updateSpeedAltitudeWeights(param, flag)};
+
 	ControlValues seb_rate{_calcPitchControlSebRate(weight, specific_energy_rate)};
 
 	_pitch_setpoint = _calcPitchControlOutput(input, seb_rate, param, flag);
@@ -330,13 +332,53 @@ float TECSControl::_calcAirspeedControlOutput(const Setpoint &setpoint, const In
 	return airspeed_rate_output;
 }
 
-float TECSControl::_calcAltitudeControlOutput(const Setpoint &setpoint, const Input &input, const Param &param) const
+float TECSControl::_calcAltitudeControlOutput(const Setpoint &setpoint, const Input &input, const Param &param)
 {
 	float altitude_rate_output;
-	altitude_rate_output = (setpoint.altitude_reference.alt - input.altitude) * param.altitude_error_gain
-			       + param.altitude_setpoint_gain_ff * setpoint.altitude_reference.alt_rate;
 
-	altitude_rate_output = math::constrain(altitude_rate_output, -param.max_sink_rate, param.max_climb_rate);
+	// ----- modified for Switch Master project, DAER Polimi -----
+
+	if (param.is_gamma_sp) { // a finite value of height rate arrived from pos control
+
+		float altitude_margin = fabsf(setpoint.altitude_reference.alt_rate * 2.0f); // margin to start reducing the rate [m/s * s]
+		altitude_margin = math::constrain(altitude_margin, 4.0f, 30.0f);
+		float h_gain;
+
+		if (setpoint.altitude_reference.alt_rate >= 0.0f) {
+			// gamma climb mode
+			h_gain = (setpoint.altitude_reference.alt - input.altitude) * (1 / altitude_margin);
+		} else {
+			// gamma sink mode
+			h_gain = (input.altitude - setpoint.altitude_reference.alt) * (1 / altitude_margin);
+		}
+		h_gain = math::constrain(h_gain, 0.0f, 1.0f);
+		altitude_rate_output = setpoint.altitude_reference.alt_rate * h_gain; // fixed gamma setpoint with also altitude sp
+		altitude_rate_output = math::constrain(altitude_rate_output, -param.max_sink_rate, param.max_climb_rate);
+
+	} else {
+		glide_mode_switch_master_s glide_mode_switch_master;
+		bool update = _glide_mode_switch_master_sub.update(&glide_mode_switch_master);
+
+		if (update) {		// Switch Master glide mode trigger
+			if (!_glide_mode && glide_mode_switch_master.glide_enabled) {
+				_glide_mode = true;
+				PX4_INFO("GLIDE MODE ACTIVATED");
+			} else if (_glide_mode && !glide_mode_switch_master.glide_enabled) {
+				_glide_mode = false;
+				PX4_INFO("GLIDE MODE OFF");
+			}
+		}
+
+		if (_glide_mode && input.altitude < setpoint.altitude_reference.alt) {
+			_glide_mode = false;
+			PX4_INFO("GLIDE MODE OFF");
+		}
+
+		// safe value to be ignored by TECS in glide mode (see function _updateSpeedAltitudeWeights)
+		// also good enough in normal flight
+		altitude_rate_output = (setpoint.altitude_reference.alt - input.altitude) * param.altitude_error_gain;
+		altitude_rate_output = math::constrain(altitude_rate_output, -param.target_sinkrate, param.target_climbrate);
+	}
 
 	return altitude_rate_output;
 }
@@ -387,6 +429,10 @@ TECSControl::SpecificEnergyWeighting TECSControl::_updateSpeedAltitudeWeights(co
 	SpecificEnergyWeighting weight;
 	// Calculate the weight applied to control of specific kinetic energy error
 	float pitch_speed_weight = constrain(param.pitch_speed_weight, 0.0f, 2.0f);
+
+	if (_glide_mode) {		// Switch Master glide mode activation
+		pitch_speed_weight = 2.0f;
+	}
 
 	if (_ratio_undersped > FLT_EPSILON && flag.airspeed_enabled) {
 		pitch_speed_weight = 2.0f * _ratio_undersped + (1.0f - _ratio_undersped) * pitch_speed_weight;
@@ -470,6 +516,24 @@ void TECSControl::_calcPitchControlUpdate(float dt, const Input &input, const Co
 			pitch_integ_input = max(pitch_integ_input, 0.f);
 		}
 
+		// Switch Master TECS stand by mode
+		auto_control_stand_by_mode_switch_master_s auto_control_stand_by_mode;
+
+		if (_auto_control_stand_by_mode_switch_master_sub.update(&auto_control_stand_by_mode)) {
+			if (!_stand_by_mode && auto_control_stand_by_mode.enabled) {
+				_stand_by_mode = true;
+				PX4_INFO("TECS STAND BY MODE ON");
+			}
+			else if (_stand_by_mode && !auto_control_stand_by_mode.enabled) {
+				_stand_by_mode = false;
+				PX4_INFO("TECS STAND BY MODE OFF");
+			}
+		}
+		// prevent integrator from increasing when in stand by mode
+		if (_stand_by_mode) {
+			pitch_integ_input = 0.0f;
+		}
+
 		// Update the pitch integrator state.
 		_pitch_integ_state = _pitch_integ_state + pitch_integ_input * dt;
 
@@ -525,8 +589,12 @@ void TECSControl::_calcThrottleControl(float dt, const SpecificEnergyRates &spec
 		throttle_setpoint = constrain(throttle_setpoint, _throttle_setpoint - throttle_increment_limit,
 					      _throttle_setpoint + throttle_increment_limit);
 	}
-
 	_throttle_setpoint = constrain(throttle_setpoint, param.throttle_min, param.throttle_max);
+
+	// Switch Master glide mode activation
+	if (_glide_mode) {
+		_throttle_setpoint = 0.0f;
+	}
 
 	// Debug output
 	_debug_output.total_energy_rate_estimate = ste_rate.estimate;
@@ -572,6 +640,11 @@ void TECSControl::_calcThrottleControlUpdate(float dt, const STERateLimit &limit
 
 			} else if (_throttle_setpoint <= param.throttle_min) {
 				throttle_integ_input = math::max(0.f, throttle_integ_input);
+			}
+
+			// prevent integrator from increasing when in stand by mode
+			if (_stand_by_mode) {
+				throttle_integ_input = 0.0f;
 			}
 
 			// Calculate a throttle demand from the integrated total energy rate error
@@ -650,6 +723,9 @@ void TECS::initControlParams(float target_climbrate, float target_sinkrate, floa
 	_reference_param.target_climbrate = target_climbrate;
 	_reference_param.target_sinkrate = target_sinkrate;
 	// Control
+	_control_param.target_climbrate = target_climbrate;
+	_control_param.target_sinkrate = target_sinkrate;
+
 	_control_param.tas_min = eas_to_tas * _equivalent_airspeed_min;
 	_control_param.pitch_max = pitch_limit_max;
 	_control_param.pitch_min = pitch_limit_min;
@@ -713,14 +789,22 @@ void TECS::update(float pitch, float altitude, float hgt_setpoint, float EAS_set
 
 		// Update Reference model submodule
 		const TECSAltitudeReferenceModel::AltitudeReferenceState setpoint{ .alt = hgt_setpoint,
-				.alt_rate = hgt_rate_sp};
+				.alt_rate = hgt_rate_sp}; // from pos control
 
-		_altitude_reference_model.update(dt, setpoint, altitude, hgt_rate, _reference_param);
+		// ----- Switch Master mode handling logic -----
+
+		//_altitude_reference_model.update(dt, setpoint, altitude, hgt_rate, _reference_param); // bypass
 
 		TECSControl::Setpoint control_setpoint;
-		control_setpoint.altitude_reference = _altitude_reference_model.getAltitudeReference();
+
+		_control_param.is_gamma_sp = isFinite(hgt_rate_sp); // if finite then gamma must be a setpoint
+
+		// control_setpoint.altitude_reference = _altitude_reference_model.getAltitudeReference(); // bypass
+		control_setpoint.altitude_reference = setpoint; // read directly from pos control
+		//-----------------------------------------------
+
 		control_setpoint.altitude_rate_setpoint_direct = _altitude_reference_model.getHeightRateSetpointDirect();
-		control_setpoint.tas_setpoint = eas_to_tas * EAS_setpoint;
+		control_setpoint.tas_setpoint = eas_to_tas * EAS_setpoint; // from position control
 
 		const TECSControl::Input control_input{ .altitude = altitude,
 							.altitude_rate = hgt_rate,
