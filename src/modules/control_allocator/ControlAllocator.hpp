@@ -142,6 +142,8 @@ private:
 
 	void end_maneuver();
 
+	float apply_propulsive_control(float actuator_sp, int motor_idx, float aileron_sp, float rudder_sp);
+
 	AllocationMethod _allocation_method_id{AllocationMethod::NONE};
 	ControlAllocation *_control_allocation[ActuatorEffectiveness::MAX_NUM_MATRICES] {}; 	///< class for control allocation calculations
 	int _num_control_allocation{0};
@@ -239,6 +241,14 @@ private:
 	float _man_period, _man_duration, _man_amplitude, _man_delay;
 	bool _man_test_switch_state{false};
 	bool _man_enabled{false};
+	int _working_mode{0};
+
+	enum WorkingModePropControl {
+		MULTI_ENGINE = 0,
+		SINGLE_ENGINE = 1,
+		PROP_CONTROL_CS = 2,
+		PROP_CONTROL_NO_CS = 3
+	};
 
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::CA_AIRFRAME>) _param_ca_airframe,
@@ -251,7 +261,13 @@ private:
 		(ParamInt<px4::params::FW_MAN_TEST>) _param_man_test,
 		(ParamInt<px4::params::FW_MAN_TEST_IDX>) _param_man_test_idx,
 		(ParamFloat<px4::params::FW_MAN_DELAY>) _param_man_delay,
-		(ParamFloat<px4::params::ACT_MAX_RATE>) _param_act_max_rate
+		(ParamFloat<px4::params::ACT_MAX_RATE>) _param_act_max_rate,
+		(ParamFloat<px4::params::MAX_DELTA_T_SE>) _param_max_delta_t_se,
+		(ParamFloat<px4::params::DELTA_T_R_CS>) _param_delta_t_roll_cs,
+		(ParamFloat<px4::params::DELTA_T_Y_CS>) _param_delta_t_yaw_cs,
+		(ParamFloat<px4::params::DELTA_T_R_NO_CS>) _param_delta_t_roll_no_cs,
+		(ParamFloat<px4::params::DELTA_T_Y_NO_CS>) _param_delta_t_yaw_no_cs,
+		(ParamInt<px4::params::WORKING_MODE>) _param_prop_control_working_mode
 	)
 
 };

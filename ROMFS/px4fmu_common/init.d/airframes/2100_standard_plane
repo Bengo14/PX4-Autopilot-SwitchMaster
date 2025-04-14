@@ -284,3 +284,6 @@ param set-default BAT2_V_LOAD_DROP 0.5000
 param set-default FW_MAN_TRIM_TIME 0.2000
 param set-default NPFG_DAMPING 0.6000
 param set-default ACT_MAX_RATE 10.0000
+
+param set-default DELTA_T_R_CS 0.1000
+param set-default DELTA_T_Y_CS 0.1000

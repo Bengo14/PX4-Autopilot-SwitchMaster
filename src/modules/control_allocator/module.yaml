@@ -618,7 +618,63 @@ parameters:
           max: 2.0
           unit: s
           default: 0.5
-
+    - group: PROPULSIVE CONTROL
+      definitions:
+        WORKING_MODE:
+          description:
+            short: Propulsive control working mode
+          type: enum
+          values:
+            0: Multi Engine
+            1: Single Engine
+            2: Propulsive Control with CS
+            3: Propulsive Control without CS
+          default: 0
+        MAX_DELTA_T_SE:
+          description:
+            short: Maximum delta thrust of one electric motor in single engine mode
+          type: float
+          decimal: 2
+          increment: 0.01
+          min: 0.0
+          max: 0.5
+          default: 0.2
+        DELTA_T_R_NO_CS:
+          description:
+            short: Delta thrust of a couple of electric motors for roll control, without control surfaces
+          type: float
+          decimal: 2
+          increment: 0.01
+          min: 0.0
+          max: 0.5
+          default: 0.2
+        DELTA_T_Y_NO_CS:
+          description:
+            short: Delta thrust of one electric motor for yaw control, without control surfaces
+          type: float
+          decimal: 2
+          increment: 0.01
+          min: 0.0
+          max: 0.5
+          default: 0.2
+        DELTA_T_R_CS:
+          description:
+            short: Delta thrust of a couple of electric motors for roll control, along with control surfaces
+          type: float
+          decimal: 2
+          increment: 0.01
+          min: 0.0
+          max: 0.5
+          default: 0.2
+        DELTA_T_Y_CS:
+          description:
+            short: Delta thrust of one electric motor for yaw control, along with control surfaces
+          type: float
+          decimal: 2
+          increment: 0.01
+          min: 0.0
+          max: 0.5
+          default: 0.2
 # Mixer
 mixer:
     actuator_types:

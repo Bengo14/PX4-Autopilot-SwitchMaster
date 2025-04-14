@@ -1009,10 +1009,24 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 
 	// motors
 	int motors_idx;
+	updateParams(); // update changed params from storage (Switch Master)
+
+	// ---- Switch Master propulsive control ----
+	if (_handled_motor_failure_bitmask != 0) {
+		_working_mode = WorkingModePropControl::PROP_CONTROL_CS;
+	} else {
+		_working_mode = _param_prop_control_working_mode.get();
+	}
+	float aileron_sp = _control_allocation[0]->getActuatorSetpoint()(6);
+	float rudder_sp = _control_allocation[0]->getActuatorSetpoint()(9);
 
 	for (motors_idx = 0; motors_idx < _num_actuators[0] && motors_idx < actuator_motors_s::NUM_CONTROLS; motors_idx++) {
 		int selected_matrix = _control_allocation_selection_indexes[actuator_idx];
 		float actuator_sp = _control_allocation[selected_matrix]->getActuatorSetpoint()(actuator_idx_matrix[selected_matrix]);
+
+		if (PX4_ISFINITE(actuator_sp)) {
+			actuator_sp = apply_propulsive_control(actuator_sp, motors_idx, aileron_sp, rudder_sp);
+		}
 
 		// ---- Switch Master maneuver ----
 		if (exec_maneuver) {
@@ -1029,16 +1043,30 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 				_offset_computed_motors = true;
 				char buffer[50];
 				sprintf(buffer, "Motors offset: ");
-				int p = 15;
+				int p = 15; // pay attention to the hardcoded string length
 				for (int i = 0; i < _num_actuators[0]; i++) {
 					sprintf(&buffer[p], "%.2f ", (double)_offset_motors[i]);
 					p += 5;
 				}
 				PX4_INFO("%s", buffer);
 			}
-			actuator_sp = _offset_motors[motors_idx];
+			if (PX4_ISFINITE(actuator_sp)) {
+				actuator_sp = _offset_motors[motors_idx];
+			}
 		} else {
-			_motors_latest_samples[motors_idx][_counter] = actuator_sp;
+			if (_counter == -1) {
+				if (PX4_ISFINITE(actuator_sp)) {
+					_motors_latest_samples[motors_idx][0] = actuator_sp;
+				} else {
+					_motors_latest_samples[motors_idx][0] = 0.0f;
+				}
+			} else {
+				if (PX4_ISFINITE(actuator_sp)) {
+					_motors_latest_samples[motors_idx][_counter] = actuator_sp;
+				} else {
+					_motors_latest_samples[motors_idx][_counter] = 0.0f;
+				}
+			}
 			if (_offset_computed_motors) {
 				_offset_computed_motors = false;
 			}
@@ -1046,7 +1074,8 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 
 		actuator_motors.control[motors_idx] = PX4_ISFINITE(actuator_sp) ? actuator_sp : NAN;
 
-		if (stopped_motors & (1u << motors_idx)) {
+		if (stopped_motors & (1u << motors_idx) && _working_mode != WorkingModePropControl::PROP_CONTROL_CS &&
+		    _working_mode != WorkingModePropControl::PROP_CONTROL_NO_CS) {
 			actuator_motors.control[motors_idx] = NAN;
 		}
 
@@ -1067,6 +1096,13 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 		for (servos_idx = 0; servos_idx < _num_actuators[1] && servos_idx < actuator_servos_s::NUM_CONTROLS; servos_idx++) {
 			int selected_matrix = _control_allocation_selection_indexes[actuator_idx];
 			float actuator_sp = _control_allocation[selected_matrix]->getActuatorSetpoint()(actuator_idx_matrix[selected_matrix]);
+
+			// propulsive control without aileron and rudder
+			if (_working_mode == WorkingModePropControl::PROP_CONTROL_NO_CS) {
+				if (servos_idx == 0 || servos_idx == 1 || servos_idx == 3) {
+					actuator_sp = 0.0f;
+				}
+			}
 
 			// ---- Switch Master maneuver ----
 			if (exec_maneuver) {
@@ -1128,7 +1164,11 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 			} else {
 				if (servos_idx == 0) {
 					// update circular array with new sample
-					_actuators_latest_samples[servos_idx][_counter] = actuator_sp;
+					if (_counter == -1) {
+						_actuators_latest_samples[servos_idx][0] = actuator_sp;
+					} else {
+						_actuators_latest_samples[servos_idx][_counter] = actuator_sp;
+					}
 					if (_offset_computed_a) {
 						_offset_computed_a = false;
 					}
@@ -1143,7 +1183,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 					float max_var = rate * delta_time;
 					max_var = math::constrain(max_var, 0.0004f, 0.04f);
 
-					if (_counter == -1) { // initialize (otherwise the starting value in PixHawk is out of bounds)
+					if (_counter == -1) { // initialized to -1 (otherwise the starting value is out of bounds)
 						_counter++;
 						_actuators_latest_samples[servos_idx][WINDOW_SIZE - 1] = actuator_sp;
 					}
@@ -1166,7 +1206,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 					if (_offset_computed_r) {
 						_offset_computed_r = false;
 					}
-					// counter increase
+					// counter increase and reset
 					_counter++;
 					if (_counter == WINDOW_SIZE) {
 						_counter = 0;
@@ -1189,6 +1229,75 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 	}
 }
 
+float
+ControlAllocator::apply_propulsive_control(float actuator_sp, int motor_idx, float aileron_sp, float rudder_sp) {
+
+	float max_delta_T_SE, delta_T_Roll, delta_T_Yaw;
+
+	switch (_working_mode) {
+
+		case WorkingModePropControl::MULTI_ENGINE:
+			break; // do nothing
+
+		case WorkingModePropControl::SINGLE_ENGINE:
+			if (motor_idx == 0) {
+				max_delta_T_SE = _param_max_delta_t_se.get();
+				actuator_sp = (1.0f - max_delta_T_SE * actuator_sp) * actuator_sp;
+			}
+			break;
+
+		case WorkingModePropControl::PROP_CONTROL_CS:
+		case WorkingModePropControl::PROP_CONTROL_NO_CS:
+
+			// params with CS different from no CS
+			if (_working_mode == WorkingModePropControl::PROP_CONTROL_CS) {
+				delta_T_Roll = _param_delta_t_roll_cs.get();
+				delta_T_Yaw = _param_delta_t_yaw_cs.get();
+			} else {
+				delta_T_Roll = _param_delta_t_roll_no_cs.get();
+				delta_T_Yaw = _param_delta_t_yaw_no_cs.get();
+			}
+
+			if (motor_idx == 1 || motor_idx == 2) { // left side motors
+				actuator_sp = actuator_sp - delta_T_Roll * aileron_sp;
+				if (aileron_sp > 0.0f) { // left turn
+					actuator_sp = math::constrain(actuator_sp, 0.0f, 1.0f - 2.0f * delta_T_Roll * aileron_sp);
+				} else if (aileron_sp < 0.0f) { // right turn
+					actuator_sp = math::constrain(actuator_sp, - 2.0f * delta_T_Roll * aileron_sp, 1.0f);
+				}
+			}
+			else if (motor_idx == 3 || motor_idx == 4) { // right side motors
+				actuator_sp = actuator_sp + delta_T_Roll * aileron_sp;
+				if (aileron_sp < 0.0f) {
+					actuator_sp = math::constrain(actuator_sp, 0.0f, 1.0f + 2.0f * delta_T_Roll * aileron_sp);
+				} else if (aileron_sp > 0.0f) {
+					actuator_sp = math::constrain(actuator_sp, 2.0f * delta_T_Roll * aileron_sp, 1.0f);
+				}
+			}
+			else if (motor_idx == 0) { // left side motor
+				actuator_sp = actuator_sp + delta_T_Yaw * rudder_sp;
+				if (rudder_sp < 0.0f) { // left yaw
+					actuator_sp = math::constrain(actuator_sp, 0.0f, 1.0f + 2.0f * delta_T_Yaw * rudder_sp);
+				} else if (rudder_sp > 0.0f) { // right yaw
+					actuator_sp = math::constrain(actuator_sp, 2.0f * delta_T_Yaw * rudder_sp, 1.0f);
+				}
+			}
+			else if (motor_idx == 5) { // right side motor
+				actuator_sp = actuator_sp - delta_T_Yaw * rudder_sp;
+				if (rudder_sp > 0.0f) {
+					actuator_sp = math::constrain(actuator_sp, 0.0f, 1.0f - 2.0f * delta_T_Yaw * rudder_sp);
+				} else if (rudder_sp < 0.0f) {
+					actuator_sp = math::constrain(actuator_sp, - 2.0f * delta_T_Yaw * rudder_sp, 1.0f);
+				}
+			}
+			break;
+		default:
+			break;
+	}
+
+	return actuator_sp;
+}
+
 void
 ControlAllocator::check_for_motor_failures()
 {
@@ -1201,12 +1310,16 @@ ControlAllocator::check_for_motor_failures()
 			if (_handled_motor_failure_bitmask != failure_detector_status.motor_failure_mask) {
 				// motor failure bitmask changed
 				switch ((FailureMode)_param_ca_failure_mode.get()) {
-				case FailureMode::REMOVE_FIRST_FAILING_MOTOR: {
+					case FailureMode::REMOVE_FIRST_FAILING_MOTOR: {
 						// Count number of failed motors
-						//const int num_motors_failed = math::countSetBits(failure_detector_status.motor_failure_mask);
+						const int num_motors_failed = math::countSetBits(failure_detector_status.motor_failure_mask);
 
-						// Only handle if it is the first failure
-						if (true/*_handled_motor_failure_bitmask == 0 && num_motors_failed == 1*/) {
+						if (_man_enabled) {
+							PX4_WARN("Motor failure detected, ending maneuver");
+							end_maneuver();
+						}
+						// require healthy motors and max 2 failures
+						if (_handled_motor_failure_bitmask == 0 && num_motors_failed <= 2) {
 							_handled_motor_failure_bitmask = failure_detector_status.motor_failure_mask;
 							PX4_WARN("Updating motor allocation (0x%x)", _handled_motor_failure_bitmask);
 
@@ -1217,10 +1330,10 @@ ControlAllocator::check_for_motor_failures()
 							update_effectiveness_matrix_if_needed(EffectivenessUpdateReason::MOTOR_ACTIVATION_UPDATE);
 						}
 					}
-					break;
+						break;
 
-				default:
-					break;
+					default:
+						break;
 				}
 
 			}
