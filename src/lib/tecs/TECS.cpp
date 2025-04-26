@@ -340,6 +340,11 @@ float TECSControl::_calcAltitudeControlOutput(const Setpoint &setpoint, const In
 
 	if (param.is_gamma_sp) { // a finite value of height rate arrived from pos control
 
+		if (_glide_mode) {
+			_glide_mode = false;
+			PX4_INFO("GLIDE MODE OFF");
+		}
+
 		float altitude_margin = fabsf(setpoint.altitude_reference.alt_rate * 2.0f); // margin to start reducing the rate [m/s * s]
 		altitude_margin = math::constrain(altitude_margin, 4.0f, 30.0f);
 		float h_gain;
@@ -359,7 +364,8 @@ float TECSControl::_calcAltitudeControlOutput(const Setpoint &setpoint, const In
 		glide_mode_switch_master_s glide_mode_switch_master;
 		bool update = _glide_mode_switch_master_sub.update(&glide_mode_switch_master);
 
-		if (update) {		// Switch Master glide mode trigger
+		// Switch Master glide mode trigger
+		if (update) {
 			if (!_glide_mode && glide_mode_switch_master.glide_enabled) {
 				_glide_mode = true;
 				PX4_INFO("GLIDE MODE ACTIVATED");
@@ -369,7 +375,7 @@ float TECSControl::_calcAltitudeControlOutput(const Setpoint &setpoint, const In
 			}
 		}
 
-		if (_glide_mode && input.altitude < setpoint.altitude_reference.alt) {
+		if (_glide_mode && input.altitude < setpoint.altitude_reference.alt) { // additional safety check
 			_glide_mode = false;
 			PX4_INFO("GLIDE MODE OFF");
 		}
@@ -791,6 +797,7 @@ void TECS::update(float pitch, float altitude, float hgt_setpoint, float EAS_set
 		const TECSAltitudeReferenceModel::AltitudeReferenceState setpoint{ .alt = hgt_setpoint,
 				.alt_rate = hgt_rate_sp}; // from pos control
 
+
 		// ----- Switch Master mode handling logic -----
 
 		//_altitude_reference_model.update(dt, setpoint, altitude, hgt_rate, _reference_param); // bypass
@@ -800,7 +807,9 @@ void TECS::update(float pitch, float altitude, float hgt_setpoint, float EAS_set
 		_control_param.is_gamma_sp = isFinite(hgt_rate_sp); // if finite then gamma must be a setpoint
 
 		// control_setpoint.altitude_reference = _altitude_reference_model.getAltitudeReference(); // bypass
+
 		control_setpoint.altitude_reference = setpoint; // read directly from pos control
+
 		//-----------------------------------------------
 
 		control_setpoint.altitude_rate_setpoint_direct = _altitude_reference_model.getHeightRateSetpointDirect();
