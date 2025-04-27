@@ -1308,7 +1308,9 @@ FixedwingPositionControl::safety_checks_maneuver_and_glide() {
 	}
 	if (_glide_mode_enabled && (_current_altitude < _pos_sp_alt + 10.0f || _eas2tas * _airspeed_eas < 10.0f || -_local_pos.vz < -10.0f || _current_altitude < 30.0f)) {
 		enable_glide_mode(false);
-		abort_maneuver(ABORT_REASON::ALTITUDE_OR_SPEED);
+		if (_maneuver_started) {
+			abort_maneuver(ABORT_REASON::ALTITUDE_OR_SPEED);
+		}
 	}
 	else if (_maneuver_started && (_pos_sp_alt - _prev_pos_sp_alt) > 0.0f && (_current_altitude >= (_pos_sp_alt - _height_rate_sp * 2.f) || _eas2tas * _airspeed_eas < 10.0f || _current_altitude < 30.0f)) {
 		abort_maneuver(ABORT_REASON::ALTITUDE_OR_SPEED);
