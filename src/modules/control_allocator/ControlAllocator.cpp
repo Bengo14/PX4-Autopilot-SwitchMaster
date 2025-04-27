@@ -1009,9 +1009,11 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 
 	// motors
 	int motors_idx;
+
 	updateParams(); // update changed params from storage (Switch Master)
 
 	// ---- Switch Master propulsive control ----
+
 	if (_handled_motor_failure_bitmask != 0) {
 		_working_mode = WorkingModePropControl::PROP_CONTROL_CS;
 	} else {
@@ -1019,6 +1021,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 	}
 	float aileron_sp = _control_allocation[0]->getActuatorSetpoint()(6);
 	float rudder_sp = _control_allocation[0]->getActuatorSetpoint()(9);
+
 
 	for (motors_idx = 0; motors_idx < _num_actuators[0] && motors_idx < actuator_motors_s::NUM_CONTROLS; motors_idx++) {
 		int selected_matrix = _control_allocation_selection_indexes[actuator_idx];
@@ -1029,6 +1032,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 		}
 
 		// ---- Switch Master maneuver ----
+
 		if (exec_maneuver) {
 			if (!_offset_computed_motors) {
 				for (int i = 0; i < _num_actuators[0]; i++) {
@@ -1105,6 +1109,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 			}
 
 			// ---- Switch Master maneuver ----
+
 			if (exec_maneuver) {
 
 				if (servos_idx == 0) {
