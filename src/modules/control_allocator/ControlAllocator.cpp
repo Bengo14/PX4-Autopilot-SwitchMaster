@@ -1314,16 +1314,18 @@ ControlAllocator::check_for_motor_failures()
 
 			if (_handled_motor_failure_bitmask != failure_detector_status.motor_failure_mask) {
 				// motor failure bitmask changed
+
+				if (_man_enabled) {
+					PX4_WARN("Motor failure detected, ending maneuver");
+					end_maneuver();
+				}
+
 				switch ((FailureMode)_param_ca_failure_mode.get()) {
 					case FailureMode::REMOVE_FIRST_FAILING_MOTOR: {
 						// Count number of failed motors
 						const int num_motors_failed = math::countSetBits(failure_detector_status.motor_failure_mask);
 
-						if (_man_enabled) {
-							PX4_WARN("Motor failure detected, ending maneuver");
-							end_maneuver();
-						}
-						// require healthy motors and max 2 failures
+						// require healthy motors and max 2 failures (Switch Master)
 						if (_handled_motor_failure_bitmask == 0 && num_motors_failed <= 2) {
 							_handled_motor_failure_bitmask = failure_detector_status.motor_failure_mask;
 							PX4_WARN("Updating motor allocation (0x%x)", _handled_motor_failure_bitmask);
