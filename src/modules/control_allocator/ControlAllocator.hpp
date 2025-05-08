@@ -238,7 +238,7 @@ private:
 	float _offset_a{0.0f};
 	float _offset_r{0.0f};
 	float _offset_motors[MAX_NUM_MOTORS];
-	float _man_period, _man_duration, _man_amplitude, _man_delay;
+	float _man_period, _man_duration, _man_amplitude, _man_delay, _middle_delay;
 	bool _man_test_switch_state{false};
 	bool _man_enabled{false};
 	int _working_mode{0};
@@ -261,6 +261,7 @@ private:
 		(ParamInt<px4::params::FW_MAN_TEST>) _param_man_test,
 		(ParamInt<px4::params::FW_MAN_TEST_IDX>) _param_man_test_idx,
 		(ParamFloat<px4::params::FW_MAN_DELAY>) _param_man_delay,
+		(ParamFloat<px4::params::FW_MIDDLE_DELAY>) _param_middle_delay,
 		(ParamFloat<px4::params::ACT_MAX_RATE>) _param_act_max_rate,
 		(ParamFloat<px4::params::MAX_DELTA_T_SE>) _param_max_delta_t_se,
 		(ParamFloat<px4::params::DELTA_T_R_CS>) _param_delta_t_roll_cs,

@@ -249,6 +249,7 @@ param set-default FW_GAMMA5_CLIMB 40.0000
 param set-default FW_GAMMA5_SINK 5.0000
 param set-default FW_GAMMA6_CLIMB 0.0000
 param set-default FW_GAMMA6_SINK 5.0000
+
 param set-default FW_MAN_AMPLITUDE -0.0500
 param set-default FW_MAN_DURATION 4.5000
 param set-default FW_MAN_EN 1
@@ -258,7 +259,7 @@ param set-default FW_MAN_VEL_ERR 0.4000
 param set-default FW_MIN_WP_DIST 300.0000
 param set-default NAV_DLL_ACT 0
 param set-default NAV_RCL_ACT 1
-param set-default ACT_MAX_RATE 3.0000
+param set-default ACT_MAX_RATE 5.0000
 
 param set-default DELTA_T_R_CS 0.1000
 param set-default DELTA_T_Y_CS 0.1000

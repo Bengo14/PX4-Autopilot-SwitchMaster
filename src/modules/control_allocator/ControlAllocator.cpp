@@ -475,7 +475,9 @@ ControlAllocator::Run()
 			_man_duration = _param_man_duration.get();
 			_man_period = _param_man_period.get();
 			_man_delay = _param_man_delay.get();
+			_middle_delay = _param_middle_delay.get();
 
+			// Switch Master stand by mode trigger
 			auto_control_stand_by_mode_switch_master_s auto_control_stand_by_mode;
 			auto_control_stand_by_mode.enabled = true;
 			_auto_control_stand_by_mode_switch_master_pub.publish(auto_control_stand_by_mode);
@@ -701,27 +703,27 @@ ControlAllocator::Run()
 			}
 		}
 
-		else if (_maneuver_index == 8) { // roll - free - yaw - free doublet
+		else if (_maneuver_index == 8) { // yaw - free - roll - free doublets
 
 			if (delta_time < 0.0f) { // delay
 				publish_actuator_controls(true);
 
 			} else if (delta_time >= 0.0f && delta_time < _man_period) {
-				publish_actuator_controls(true, _man_amplitude); // roll left
-
-			} else if (delta_time >= _man_period && delta_time < 2.0f *_man_period) {
-				publish_actuator_controls(true, -_man_amplitude);
-
-			} else if (delta_time >= 2.0f *_man_period && delta_time < 10.0f *_man_period) { // free response
-				publish_actuator_controls(true);
-
-			} else if (delta_time >= 10.0f *_man_period && delta_time < 11.0f *_man_period) {
 				publish_actuator_controls(true, 0.0f, 0.0f, -_man_amplitude); // yaw left
 
-			} else if (delta_time >= 11.0f *_man_period && delta_time < 12.0f *_man_period) {
+			} else if (delta_time >= _man_period && delta_time < 2.0f *_man_period) {
 				publish_actuator_controls(true, 0.0f, 0.0f, _man_amplitude);
 
-			} else if (delta_time >= 12.0f *_man_period && delta_time <= _man_duration - _man_delay) { // free response
+			} else if (delta_time >= 2.0f *_man_period && delta_time < 2.0f *_man_period + _middle_delay) { // free response
+				publish_actuator_controls(true);
+
+			} else if (delta_time >= 2.0f * _man_period + _middle_delay && delta_time < 3.0f * _man_period + _middle_delay) {
+				publish_actuator_controls(true, _man_amplitude); // roll left
+
+			} else if (delta_time >= 3.0f * _man_period + _middle_delay && delta_time < 4.0f * _man_period + _middle_delay) {
+				publish_actuator_controls(true, -_man_amplitude);
+
+			} else if (delta_time >= 4.0f * _man_period + _middle_delay && delta_time < _man_duration - _man_delay) { // free response
 				publish_actuator_controls(true);
 
 			} else {
