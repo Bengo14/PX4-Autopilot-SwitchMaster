@@ -953,7 +953,7 @@ PARAM_DEFINE_FLOAT(FW_MIN_WP_DIST, 400f);
  * @value 5 yaw 3-2-1-1
  * @value 6 roll + yaw doublets
  * @value 7 roll + yaw 3-2-1-1
- * @value 8 roll + free + yaw + free doublets
+ * @value 8 yaw + free response + roll + free response doublets
  *
  * @min 0
  * @max 8
