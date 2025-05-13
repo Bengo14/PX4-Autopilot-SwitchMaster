@@ -338,7 +338,26 @@ float TECSControl::_calcAltitudeControlOutput(const Setpoint &setpoint, const In
 
 	// ----- modified for Switch Master project, DAER Polimi -----
 
+	glide_mode_switch_master_s glide_mode_switch_master;
+	bool update = _glide_mode_switch_master_sub.update(&glide_mode_switch_master);
+
+	// Switch Master glide mode trigger
+	if (update) {
+		if (!_glide_mode && glide_mode_switch_master.glide_enabled) {
+			_glide_mode = true;
+			PX4_INFO("GLIDE MODE ACTIVATED");
+		} else if (_glide_mode && !glide_mode_switch_master.glide_enabled) {
+			_glide_mode = false;
+			PX4_INFO("GLIDE MODE OFF");
+		}
+	}
+
 	if (param.is_gamma_sp) { // a finite value of height rate arrived from pos control
+
+		if (_glide_mode) { // additional safety check
+			_glide_mode = false;
+			PX4_INFO("GLIDE MODE OFF");
+		}
 
 		float altitude_margin = fabsf(setpoint.altitude_reference.alt_rate * 2.0f); // margin to start reducing the rate [m/s * s]
 		altitude_margin = math::constrain(altitude_margin, 4.0f, 30.0f);
@@ -356,19 +375,7 @@ float TECSControl::_calcAltitudeControlOutput(const Setpoint &setpoint, const In
 		altitude_rate_output = math::constrain(altitude_rate_output, -param.max_sink_rate, param.max_climb_rate);
 
 	} else {
-		glide_mode_switch_master_s glide_mode_switch_master;
-		bool update = _glide_mode_switch_master_sub.update(&glide_mode_switch_master);
-
-		if (update) {		// Switch Master glide mode trigger
-			if (!_glide_mode && glide_mode_switch_master.glide_enabled) {
-				_glide_mode = true;
-				PX4_INFO("GLIDE MODE ACTIVATED");
-			} else if (_glide_mode && !glide_mode_switch_master.glide_enabled) {
-				_glide_mode = false;
-				PX4_INFO("GLIDE MODE OFF");
-			}
-		}
-
+		// additional safety check
 		if (_glide_mode && input.altitude < setpoint.altitude_reference.alt) {
 			_glide_mode = false;
 			PX4_INFO("GLIDE MODE OFF");

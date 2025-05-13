@@ -546,7 +546,7 @@ parameters:
         # Switch Master
         FW_MAN_PERIOD:
           description:
-            short: Switch Master maneuver time period.
+            short: Switch Master maneuver time period
             long: Switch Master maneuver time period, for doublets it is the half period, for 3-2-1-1 it is the time unit.
           type: float
           decimal: 1
@@ -585,7 +585,7 @@ parameters:
           default: 0
         FW_MAN_TEST_IDX:
           description:
-            short: Select the maneuver to be tested.
+            short: Select the maneuver to be tested
           type: enum
           values:
               0: pitch doublet
@@ -596,11 +596,12 @@ parameters:
               5: yaw 3-2-1-1
               6: roll + yaw doublet
               7: roll + yaw 3-2-1-1
-              8: roll + free response + yaw + free response
+              8: yaw + free response + roll + free response doublets
           default: 0
         ACT_MAX_RATE:
           description:
-            short: Max rate of elevator in units/s.
+            short: Max rate of elevator in units/s
+            long: Max rate of elevator in units/s. One unit is half of the actuator range.
           type: float
           decimal: 1
           increment: 0.1
@@ -610,7 +611,18 @@ parameters:
           default: 1.0
         FW_MAN_DELAY:
           description:
-            short: Delay before the maneuver starts, in seconds, while actuators are blocked.
+            short: Delay before the maneuver starts, in seconds, while actuators are blocked
+          type: float
+          decimal: 1
+          increment: 0.1
+          min: 0.0
+          max: 2.0
+          unit: s
+          default: 0.5
+        FW_MIDDLE_DELAY:
+          description:
+            short: Delay in the middle of a maneuver
+            long:  Delay in the middle of a maneuver, where supported (e.g. yaw + roll doublets).
           type: float
           decimal: 1
           increment: 0.1
