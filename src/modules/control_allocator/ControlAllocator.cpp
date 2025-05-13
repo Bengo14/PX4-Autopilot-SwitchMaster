@@ -1018,6 +1018,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 
 		// ---- Switch Master maneuver ----
 		if (exec_maneuver) {
+
 			if (!_offset_computed_motors) {
 				for (int i = 0; i < _num_actuators[0]; i++) {
 					_offset_motors[i] = 0.0f;
@@ -1039,8 +1040,26 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 				PX4_INFO("%s", buffer);
 			}
 			actuator_sp = _offset_motors[motors_idx];
+			
+			if (PX4_ISFINITE(actuator_sp)) {
+					actuator_sp = _offset_motors[motors_idx];
+			}
+		
 		} else {
-			_motors_latest_samples[motors_idx][_counter] = actuator_sp;
+
+			if (_counter == -1) {
+				if (PX4_ISFINITE(actuator_sp)) {
+					_motors_latest_samples[motors_idx][0] = actuator_sp;
+				} else {
+					_motors_latest_samples[motors_idx][0] = 0.0f;
+				}
+			} else {
+				if (PX4_ISFINITE(actuator_sp)) {
+					_motors_latest_samples[motors_idx][_counter] = actuator_sp;
+				} else {
+					_motors_latest_samples[motors_idx][_counter] = 0.0f;
+				}
+			}
 			if (_offset_computed_motors) {
 				_offset_computed_motors = false;
 			}
@@ -1130,7 +1149,11 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 			} else {
 				if (servos_idx == 0) {
 					// update circular array with new sample
-					_actuators_latest_samples[servos_idx][_counter] = actuator_sp;
+					if (_counter == -1) {
+						_actuators_latest_samples[servos_idx][0] = actuator_sp;
+					} else {
+						_actuators_latest_samples[servos_idx][_counter] = actuator_sp;
+					}
 					if (_offset_computed_a) {
 						_offset_computed_a = false;
 					}
