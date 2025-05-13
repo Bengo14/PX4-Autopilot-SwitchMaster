@@ -1226,10 +1226,10 @@ ControlAllocator::check_for_motor_failures()
 			if (_handled_motor_failure_bitmask != failure_detector_status.motor_failure_mask) {
 				// motor failure bitmask changed
 
-				if (_man_enabled) {
+				/*if (_man_enabled) {
 					PX4_WARN("Motor failure detected, ending maneuver");
 					end_maneuver();
-				}
+				}*/
 
 				switch ((FailureMode)_param_ca_failure_mode.get()) {
 					case FailureMode::REMOVE_FIRST_FAILING_MOTOR: {
