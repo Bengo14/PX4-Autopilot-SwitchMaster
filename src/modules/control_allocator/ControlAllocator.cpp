@@ -43,8 +43,7 @@
 
 #include <drivers/drv_hrt.h>
 #include <circuit_breaker/circuit_breaker.h>
-#include <mathlib/math/Limits.hpp>
-#include <mathlib/math/Functions.hpp>
+#include <lib/mathlib/mathlib.h>
 
 using namespace matrix;
 using namespace time_literals;
@@ -1086,7 +1085,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 			actuator_motors.control[motors_idx] = NAN;
 		}
 
-		if (PX4_ISFINITE(actuator_sp) && !iszero(actuator_sp)) { // normal setpoint
+		if (PX4_ISFINITE(actuator_sp) && !math::isZero(actuator_sp)) { // normal setpoint
 			actuator_motors.control[motors_idx] = actuator_sp;
 
 		} else { // setpoint is zero (motor stopped or saturated by prop control) or not finite
