@@ -1021,6 +1021,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 	} else {
 		_working_mode = _param_prop_control_working_mode.get();
 	}
+	
 	float aileron_sp = _control_allocation[0]->getActuatorSetpoint()(_num_actuators[0]);
 	float rudder_sp = _control_allocation[0]->getActuatorSetpoint()(_num_actuators[0] + 3);
 
@@ -1036,6 +1037,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 		// ---- Switch Master maneuver ----
 
 		if (exec_maneuver) {
+
 			if (!_offset_computed_motors) {
 				for (int i = 0; i < _num_actuators[0]; i++) {
 					_offset_motors[i] = 0.0f;
@@ -1059,7 +1061,9 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 			if (PX4_ISFINITE(actuator_sp)) {
 				actuator_sp = _offset_motors[motors_idx];
 			}
+
 		} else {
+
 			if (_counter == -1) {
 				if (PX4_ISFINITE(actuator_sp)) {
 					_motors_latest_samples[motors_idx][0] = actuator_sp;
@@ -1325,10 +1329,10 @@ ControlAllocator::check_for_motor_failures()
 			if (_handled_motor_failure_bitmask != failure_detector_status.motor_failure_mask) {
 				// motor failure bitmask changed
 
-				if (_man_enabled) {
+				/*if (_man_enabled) {
 					PX4_WARN("Motor failure detected, ending maneuver");
 					end_maneuver();
-				}
+				}*/
 
 				switch ((FailureMode)_param_ca_failure_mode.get()) {
 					case FailureMode::REMOVE_FIRST_FAILING_MOTOR: {
