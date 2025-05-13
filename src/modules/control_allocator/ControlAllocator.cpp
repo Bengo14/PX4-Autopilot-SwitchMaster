@@ -508,7 +508,7 @@ ControlAllocator::Run()
 					PX4_INFO("EXECUTING ROLL + YAW 3-2-1-1...");
 					break;
 				case 8:
-					PX4_INFO("EXECUTING SEPARATED ROLL + YAW DOUBLETS...");
+					PX4_INFO("EXECUTING SEPARATED YAW + ROLL DOUBLETS...");
 					break;
 				default:
 					break;
