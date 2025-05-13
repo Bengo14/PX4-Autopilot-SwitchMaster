@@ -43,7 +43,8 @@
 
 #include <drivers/drv_hrt.h>
 #include <circuit_breaker/circuit_breaker.h>
-#include <lib/mathlib/mathlib.h>
+#include <mathlib/math/Limits.hpp>
+#include <mathlib/math/Functions.hpp>
 
 using namespace matrix;
 using namespace time_literals;
@@ -507,7 +508,7 @@ ControlAllocator::Run()
 					PX4_INFO("EXECUTING ROLL + YAW 3-2-1-1...");
 					break;
 				case 8:
-					PX4_INFO("EXECUTING SEPARATED ROLL + YAW DOUBLETS...");
+					PX4_INFO("EXECUTING SEPARATED YAW + ROLL DOUBLETS...");
 					break;
 				default:
 					break;
@@ -1013,12 +1014,32 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 
 	updateParams(); // update changed params from storage (Switch Master)
 
-	// ---- Switch Master propulsive control ----
+	// ---- Switch Master Propulsive Control (ITC/CTC) ----
 
-	if (_handled_motor_failure_bitmask != 0) {
+	if (_handled_motor_failure_bitmask != 0 && _working_mode != WorkingModePropControl::PROP_CONTROL_CS) {
+		// always use propulsive control and control surfaces if there are failed motors
 		_working_mode = WorkingModePropControl::PROP_CONTROL_CS;
-	} else {
+		PX4_INFO("Individual Thrust Control: With Control Surfaces");
+
+	} else if (_handled_motor_failure_bitmask == 0 && _working_mode != _param_prop_control_working_mode.get()) {
 		_working_mode = _param_prop_control_working_mode.get();
+
+		switch (_working_mode) {
+			case WorkingModePropControl::PROP_CONTROL_CS:
+				PX4_INFO("Individual Thrust Control: With Control Surfaces");
+				break;
+			case WorkingModePropControl::PROP_CONTROL_NO_CS:
+				PX4_INFO("Individual Thrust Control: Without Control Surfaces");
+				break;
+			case WorkingModePropControl::MULTI_ENGINE:
+				PX4_INFO("Collective Thrust Control: Multi Engine");
+				break;
+			case WorkingModePropControl::SINGLE_ENGINE:
+				PX4_INFO("Collective Thrust Control: Single Engine");
+				break;
+			default:
+				break;
+		}
 	}
 	
 	float aileron_sp = _control_allocation[0]->getActuatorSetpoint()(_num_actuators[0]);
@@ -1047,6 +1068,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 					}
 					_offset_motors[j] /= (float)WINDOW_SIZE;
 				}
+
 				_offset_computed_motors = true;
 				char buffer[50];
 				sprintf(buffer, "Motors offset: ");
