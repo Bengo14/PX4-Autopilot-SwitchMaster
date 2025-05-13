@@ -1021,14 +1021,14 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 	} else {
 		_working_mode = _param_prop_control_working_mode.get();
 	}
-	float aileron_sp = _control_allocation[0]->getActuatorSetpoint()(6);
-	float rudder_sp = _control_allocation[0]->getActuatorSetpoint()(9);
+	float aileron_sp = _control_allocation[0]->getActuatorSetpoint()(_num_actuators[0]);
+	float rudder_sp = _control_allocation[0]->getActuatorSetpoint()(_num_actuators[0] + 3);
 
 
 	for (motors_idx = 0; motors_idx < _num_actuators[0] && motors_idx < actuator_motors_s::NUM_CONTROLS; motors_idx++) {
 		int selected_matrix = _control_allocation_selection_indexes[actuator_idx];
 		float actuator_sp = _control_allocation[selected_matrix]->getActuatorSetpoint()(actuator_idx_matrix[selected_matrix]);
-
+		
 		if (PX4_ISFINITE(actuator_sp)) {
 			actuator_sp = apply_propulsive_control(actuator_sp, motors_idx, aileron_sp, rudder_sp);
 		}
@@ -1078,10 +1078,18 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 			}
 		}
 
-		actuator_motors.control[motors_idx] = PX4_ISFINITE(actuator_sp) ? actuator_sp : NAN;
+		if (stopped_motors & (1u << motors_idx)) { // stopped or failed motors
+			actuator_motors.control[motors_idx] = NAN;
+		}
 
-		if (stopped_motors & (1u << motors_idx) && _working_mode != WorkingModePropControl::PROP_CONTROL_CS &&
-		    _working_mode != WorkingModePropControl::PROP_CONTROL_NO_CS) {
+		if (PX4_ISFINITE(actuator_sp) && !iszero(actuator_sp)) { // normal setpoint
+			actuator_motors.control[motors_idx] = actuator_sp;
+
+		} else { // setpoint is zero (motor stopped or saturated by prop control) or not finite
+			actuator_motors.control[motors_idx] = NAN;
+		}
+
+		if (_handled_motor_failure_bitmask & (1u << motors_idx)) { // avoid that prop control can activate failed motors
 			actuator_motors.control[motors_idx] = NAN;
 		}
 
