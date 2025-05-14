@@ -596,7 +596,7 @@ parameters:
               5: yaw 3-2-1-1
               6: roll + yaw doublet
               7: roll + yaw 3-2-1-1
-              8: yaw + free response + roll + free response doublets
+              8: yaw + free + roll + free doublets
           default: 0
         ACT_MAX_RATE:
           description:
