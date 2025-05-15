@@ -1157,7 +1157,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 						_offset_computed_a = true;
 						PX4_INFO("Aileron offset: %.2f", (double)_offset_a);
 
-						if (fabsf(_offset_a) > 0.05f) {
+						if (fabsf(_offset_a - 0.07f) > 0.05f) { // TODO: do not hardcode trim value but take it from the config
 							PX4_WARN("Aileron offset too high, ending maneuver");
 							end_maneuver();
 							return;
@@ -1190,7 +1190,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 						_offset_computed_r = true;
 						PX4_INFO("Rudder offset: %.2f", (double)_offset_r);
 
-						if (fabsf(_offset_r) > 0.12f) {
+						if (fabsf(_offset_r - 0.12f) > 0.05f) { // TODO: do not hardcode trim value but take it from the config
 							PX4_WARN("Rudder offset too high, ending maneuver");
 							end_maneuver();
 							return;
@@ -1350,10 +1350,10 @@ ControlAllocator::check_for_motor_failures()
 			if (_handled_motor_failure_bitmask != failure_detector_status.motor_failure_mask) {
 				// motor failure bitmask changed
 
-				/*if (_man_enabled) {
+				if (_man_enabled) {
 					PX4_WARN("Motor failure detected, ending maneuver");
 					end_maneuver();
-				}*/
+				}
 
 				switch ((FailureMode)_param_ca_failure_mode.get()) {
 					case FailureMode::REMOVE_FIRST_FAILING_MOTOR: {
