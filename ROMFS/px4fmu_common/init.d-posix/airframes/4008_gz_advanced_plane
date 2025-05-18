@@ -117,7 +117,6 @@ param set-default PWM_MAIN_FUNC8 202
 param set-default PWM_MAIN_FUNC9 203
 param set-default PWM_MAIN_REV 3072
 
-
 param set-default SDLOG_DIRS_MAX 0
 param set-default SDLOG_MODE 0
 param set-default SIM_BAT_MIN_PCT 20.0000
@@ -135,34 +134,27 @@ param set-default BAT_AVRG_CURRENT 10.0000
 param set-default CA_ROTOR0_CT 11.0000
 param set-default CA_ROTOR0_KM 0.0500
 param set-default CA_ROTOR0_PX 0.0000
-param set-default CA_ROTOR0_PY -0.3000
 param set-default CA_ROTOR1_CT 11.0000
 param set-default CA_ROTOR1_KM 0.0500
 param set-default CA_ROTOR1_PX 0.0000
-param set-default CA_ROTOR1_PY -0.5000
 param set-default CA_ROTOR2_CT 11.0000
 param set-default CA_ROTOR2_KM 0.0500
 param set-default CA_ROTOR2_PX 0.0000
-param set-default CA_ROTOR2_PY -0.7000
 param set-default CA_ROTOR3_CT 11.0000
 param set-default CA_ROTOR3_KM 0.0500
 param set-default CA_ROTOR3_PX 0.0000
-param set-default CA_ROTOR3_PY 0.3000
 param set-default CA_ROTOR4_CT 11.0000
 param set-default CA_ROTOR4_KM 0.0500
 param set-default CA_ROTOR4_PX 0.0000
-param set-default CA_ROTOR4_PY 0.5000
 param set-default CA_ROTOR5_CT 11.0000
 param set-default CA_ROTOR5_KM 0.0500
 param set-default CA_ROTOR5_PX 0.0000
-param set-default CA_ROTOR5_PY 0.7000
-
-param set-default CA_R0_SLEW 3.0000
-param set-default CA_R1_SLEW 3.0000
-param set-default CA_R2_SLEW 3.0000
-param set-default CA_R3_SLEW 3.0000
-param set-default CA_R4_SLEW 3.0000
-param set-default CA_R5_SLEW 3.0000
+param set-default CA_ROTOR0_PY -0.8000
+param set-default CA_ROTOR1_PY -0.5000
+param set-default CA_ROTOR2_PY -0.2700
+param set-default CA_ROTOR3_PY 0.2700
+param set-default CA_ROTOR4_PY 0.5000
+param set-default CA_ROTOR5_PY 0.8000
 
 param set-default FW_AIRSPD_MAX 25.0000
 param set-default FW_AIRSPD_MIN 10.0000
@@ -197,6 +189,7 @@ param set-default FW_RR_FF 0.0432
 param set-default FW_RR_I 0.1920
 param set-default FW_RR_P 0.1939
 param set-default FW_R_TC 0.2482
+
 param set-default FW_THR_SLEW_MAX 0.0000
 param set-default FW_THR_TRIM 0.5100
 param set-default FW_T_ALT_TC 2.5000

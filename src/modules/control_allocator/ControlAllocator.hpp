@@ -225,23 +225,32 @@ private:
 	static const int WINDOW_SIZE = 200; // size of the arrays to store samples for actuators offset computation
 	hrt_abstime _man_starting_time{0};
 	hrt_abstime _prev_time{0};
-	uint8_t _maneuver_index{0};
+
 	float _servos_last_update[MAX_NUM_SERVOS];
 	float _actuators_latest_samples[MAX_NUM_SERVOS][WINDOW_SIZE];
 	float _motors_latest_samples[MAX_NUM_MOTORS][WINDOW_SIZE];
 	int _counter{-1};
-	bool _offset_computed_e{false};
-	bool _offset_computed_a{false};
-	bool _offset_computed_r{false};
-	bool _offset_computed_motors{false};
-	float _offset_e{0.0f};
-	float _offset_a{0.0f};
-	float _offset_r{0.0f};
-	float _offset_motors[MAX_NUM_MOTORS];
+	
+	uint8_t _maneuver_index{0};
 	float _man_period, _man_duration, _man_amplitude, _man_delay, _middle_delay;
 	bool _man_test_switch_state{false};
 	bool _man_enabled{false};
 	int _working_mode{0};
+	uint16_t _failure_bitmask{0};
+
+	struct Offsets {
+		bool offset_computed_e{false};
+		bool offset_computed_a{false};
+		bool offset_computed_r{false};
+		bool offset_computed_motors{false};
+		float offset_e{0.0f};
+		float offset_a{0.0f};
+		float offset_r{0.0f};
+		float offset_motors[MAX_NUM_MOTORS];
+	};
+
+	Offsets _offsets;
+	float _trims[MAX_NUM_SERVOS];
 
 	enum WorkingModePropControl {
 		MULTI_ENGINE = 0,
@@ -268,7 +277,8 @@ private:
 		(ParamFloat<px4::params::DELTA_T_Y_CS>) _param_delta_t_yaw_cs,
 		(ParamFloat<px4::params::DELTA_T_R_NO_CS>) _param_delta_t_roll_no_cs,
 		(ParamFloat<px4::params::DELTA_T_Y_NO_CS>) _param_delta_t_yaw_no_cs,
-		(ParamInt<px4::params::WORKING_MODE>) _param_prop_control_working_mode
+		(ParamInt<px4::params::WORKING_MODE>) _param_prop_control_working_mode,
+		(ParamInt<px4::params::MOT_FAIL_INJ>) _param_failure_injection_bitmask
 	)
 
 };

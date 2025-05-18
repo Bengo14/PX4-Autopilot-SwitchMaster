@@ -866,6 +866,9 @@ ControlAllocator::update_effectiveness_matrix_if_needed(EffectivenessUpdateReaso
 					minimum[selected_matrix](actuator_idx_matrix[selected_matrix]) = -1.f;
 					slew_rate[selected_matrix](actuator_idx_matrix[selected_matrix]) = _params.slew_rate_servos[actuator_type_idx];
 					trims.trim[actuator_type_idx] = config.trim[selected_matrix](actuator_idx_matrix[selected_matrix]);
+					// Switch Master: save trim values
+					_trims[actuator_type_idx] = config.trim[selected_matrix](actuator_idx_matrix[selected_matrix]);
+					PX4_INFO("Servo %d trim: %f", actuator_type_idx, (double)_trims[actuator_type_idx]);
 
 				} else {
 					minimum[selected_matrix](actuator_idx_matrix[selected_matrix]) = -1.f;
@@ -1058,29 +1061,29 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 
 		if (exec_maneuver) {
 
-			if (!_offset_computed_motors) {
+			if (!_offsets.offset_computed_motors) {
 				for (int i = 0; i < _num_actuators[0]; i++) {
-					_offset_motors[i] = 0.0f;
+					_offsets.offset_motors[i] = 0.0f;
 				}
 				for (int j = 0; j < _num_actuators[0]; j++) {
 					for (int i = 0; i < WINDOW_SIZE; i++) {
-						_offset_motors[j] += _motors_latest_samples[j][i];
+						_offsets.offset_motors[j] += _motors_latest_samples[j][i];
 					}
-					_offset_motors[j] /= (float)WINDOW_SIZE;
+					_offsets.offset_motors[j] /= (float)WINDOW_SIZE;
 				}
 
-				_offset_computed_motors = true;
+				_offsets.offset_computed_motors = true;
 				char buffer[50];
 				sprintf(buffer, "Motors offset: ");
 				int p = 15; // pay attention to the hardcoded string length
 				for (int i = 0; i < _num_actuators[0]; i++) {
-					sprintf(&buffer[p], "%.2f ", (double)_offset_motors[i]);
+					sprintf(&buffer[p], "%.2f ", (double)_offsets.offset_motors[i]);
 					p += 5;
 				}
 				PX4_INFO("%s", buffer);
 			}
 			if (PX4_ISFINITE(actuator_sp)) {
-				actuator_sp = _offset_motors[motors_idx];
+				actuator_sp = _offsets.offset_motors[motors_idx];
 			}
 
 		} else {
@@ -1098,8 +1101,8 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 					_motors_latest_samples[motors_idx][_counter] = 0.0f;
 				}
 			}
-			if (_offset_computed_motors) {
-				_offset_computed_motors = false;
+			if (_offsets.offset_computed_motors) {
+				_offsets.offset_computed_motors = false;
 			}
 		}
 
@@ -1139,7 +1142,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 			// propulsive control without aileron and rudder
 			if (_working_mode == WorkingModePropControl::PROP_CONTROL_NO_CS) {
 				if (servos_idx == 0 || servos_idx == 1 || servos_idx == 3) {
-					actuator_sp = 0.0f;
+					actuator_sp = _trims[servos_idx];
 				}
 			}
 
@@ -1148,60 +1151,65 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 			if (exec_maneuver) {
 
 				if (servos_idx == 0) {
-					if (!_offset_computed_a) {
-						_offset_a = 0.0f;
+					if (!_offsets.offset_computed_a) {
+						_offsets.offset_a = 0.0f;
 						for (int i = 0; i < WINDOW_SIZE; i++) {
-							_offset_a += _actuators_latest_samples[servos_idx][i];
+							_offsets.offset_a += _actuators_latest_samples[servos_idx][i];
 						}
-						_offset_a /= (float)WINDOW_SIZE;
-						_offset_computed_a = true;
-						PX4_INFO("Aileron offset: %.2f", (double)_offset_a);
+						_offsets.offset_a /= (float)WINDOW_SIZE;
+						_offsets.offset_computed_a = true;
+						PX4_INFO("Aileron offset: %.2f", (double)_offsets.offset_a);
 
-						if (fabsf(_offset_a - 0.07f) > 0.05f) { // TODO: do not hardcode trim value but take it from the config
+						if (fabsf(_offsets.offset_a - _trims[0]) > 0.1f) {
 							PX4_WARN("Aileron offset too high, ending maneuver");
 							end_maneuver();
 							return;
 						}
 					}
-					actuator_sp = _offset_a + roll / 2.f;
+					actuator_sp = _offsets.offset_a + roll / 2.f;
 				}
-				else if (servos_idx == 1) {
-					actuator_sp = - (_offset_a + roll / 2.f);
-				}
-				else if (servos_idx == 2) {
-					if (!_offset_computed_e) {
-						_offset_e = 0.0f;
-						for (int i = 0; i < WINDOW_SIZE; i++) {
-							_offset_e += _actuators_latest_samples[servos_idx][i];
-						}
-						_offset_e /= (float)WINDOW_SIZE;
-						_offset_computed_e = true;
-						PX4_INFO("Elevator offset: %.2f", (double)_offset_e);
-					}
-					actuator_sp = _offset_e + pitch;
-				}
-				else if (servos_idx == 3) {
-					if (!_offset_computed_r) {
-						_offset_r = 0.0f;
-						for (int i = 0; i < WINDOW_SIZE; i++) {
-							_offset_r += _actuators_latest_samples[servos_idx][i];
-						}
-						_offset_r /= (float)WINDOW_SIZE;
-						_offset_computed_r = true;
-						PX4_INFO("Rudder offset: %.2f", (double)_offset_r);
 
-						if (fabsf(_offset_r - 0.12f) > 0.05f) { // TODO: do not hardcode trim value but take it from the config
+				else if (servos_idx == 1) {
+					actuator_sp = - (_offsets.offset_a + roll / 2.f);
+				}
+
+				else if (servos_idx == 2) {
+					if (!_offsets.offset_computed_e) {
+						_offsets.offset_e = 0.0f;
+						for (int i = 0; i < WINDOW_SIZE; i++) {
+							_offsets.offset_e += _actuators_latest_samples[servos_idx][i];
+						}
+						_offsets.offset_e /= (float)WINDOW_SIZE;
+						_offsets.offset_computed_e = true;
+						PX4_INFO("Elevator offset: %.2f", (double)_offsets.offset_e);
+					}
+					actuator_sp = _offsets.offset_e + pitch;
+				}
+
+				else if (servos_idx == 3) {
+					if (!_offsets.offset_computed_r) {
+						_offsets.offset_r = 0.0f;
+						for (int i = 0; i < WINDOW_SIZE; i++) {
+							_offsets.offset_r += _actuators_latest_samples[servos_idx][i];
+						}
+						_offsets.offset_r /= (float)WINDOW_SIZE;
+						_offsets.offset_computed_r = true;
+						PX4_INFO("Rudder offset: %.2f", (double)_offsets.offset_r);
+
+						if (fabsf(_offsets.offset_r - _trims[3]) > 0.1f) {
 							PX4_WARN("Rudder offset too high, ending maneuver");
 							end_maneuver();
 							return;
 						}
 					}
-					actuator_sp = _offset_r + yaw;
-				} else {
+					actuator_sp = _offsets.offset_r + yaw;
+				} 	
+				else {
 					actuator_sp = _servos_last_update[servos_idx];
 				}
 
 			} else {
+
 				if (servos_idx == 0) {
 					// update circular array with new sample
 					if (_counter == -1) {
@@ -1209,10 +1217,11 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 					} else {
 						_actuators_latest_samples[servos_idx][_counter] = actuator_sp;
 					}
-					if (_offset_computed_a) {
-						_offset_computed_a = false;
+					if (_offsets.offset_computed_a) {
+						_offsets.offset_computed_a = false;
 					}
 				}
+
 				else if (servos_idx == 2) {
 
 					// elevator max rate
@@ -1236,22 +1245,24 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 					// printf("max var: %f, prev: %d, counter: %d, sp: %f, prev_sp: %f\n", (double)max_var, prev, _counter, (double)actuator_sp, (double)_actuators_latest_samples[servos_idx][prev]);
 					// update circular array with new sample
 					_actuators_latest_samples[servos_idx][_counter] = actuator_sp;
-					if (_offset_computed_e) {
-						_offset_computed_e = false;
+					if (_offsets.offset_computed_e) {
+						_offsets.offset_computed_e = false;
 					}
 				}
+
 				else if (servos_idx == 3) {
 					// update circular array with new sample
 					_actuators_latest_samples[servos_idx][_counter] = actuator_sp;
-					if (_offset_computed_r) {
-						_offset_computed_r = false;
+					if (_offsets.offset_computed_r) {
+						_offsets.offset_computed_r = false;
 					}
 					// counter increase and reset
 					_counter++;
 					if (_counter == WINDOW_SIZE) {
 						_counter = 0;
 					}
-				} else {
+				} 
+				else {
 					_servos_last_update[servos_idx] = actuator_sp;
 				}
 			}
@@ -1272,22 +1283,34 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 float
 ControlAllocator::apply_propulsive_control(float actuator_sp, int motor_idx, float aileron_sp, float rudder_sp) {
 
-	float max_delta_T_SE, delta_T_Roll, delta_T_Yaw;
-
 	switch (_working_mode) {
 
 		case WorkingModePropControl::MULTI_ENGINE:
 			break; // do nothing
 
 		case WorkingModePropControl::SINGLE_ENGINE:
-			if (motor_idx == 0) {
-				max_delta_T_SE = _param_max_delta_t_se.get();
+		
+			if (motor_idx == 0) { // only the leftmost motor is affected
+				float max_delta_T_SE = _param_max_delta_t_se.get();
 				actuator_sp = (1.0f - max_delta_T_SE * actuator_sp) * actuator_sp;
 			}
 			break;
 
 		case WorkingModePropControl::PROP_CONTROL_CS:
 		case WorkingModePropControl::PROP_CONTROL_NO_CS:
+
+			// substract trim values for propulsive control computation
+			aileron_sp = aileron_sp - _trims[0];
+			rudder_sp = rudder_sp - _trims[3];
+			
+			if (fabsf(aileron_sp) < 0.01f) {
+				aileron_sp = 0.0f;
+			}
+			if (fabsf(rudder_sp) < 0.01f) {
+				rudder_sp = 0.0f;
+			}
+
+			float delta_T_Roll, delta_T_Yaw;
 
 			// params with CS different from no CS
 			if (_working_mode == WorkingModePropControl::PROP_CONTROL_CS) {
@@ -1298,7 +1321,7 @@ ControlAllocator::apply_propulsive_control(float actuator_sp, int motor_idx, flo
 				delta_T_Yaw = _param_delta_t_yaw_no_cs.get();
 			}
 
-			if (motor_idx == 1 || motor_idx == 2) { // left side motors
+			if (motor_idx == 0 || motor_idx == 1) { // left side motors: roll
 				actuator_sp = actuator_sp - delta_T_Roll * aileron_sp;
 				if (aileron_sp > 0.0f) { // left turn
 					actuator_sp = math::constrain(actuator_sp, 0.0f, 1.0f - 2.0f * delta_T_Roll * aileron_sp);
@@ -1306,7 +1329,7 @@ ControlAllocator::apply_propulsive_control(float actuator_sp, int motor_idx, flo
 					actuator_sp = math::constrain(actuator_sp, - 2.0f * delta_T_Roll * aileron_sp, 1.0f);
 				}
 			}
-			else if (motor_idx == 3 || motor_idx == 4) { // right side motors
+			else if (motor_idx == 4 || motor_idx == 5) { // right side motors: roll
 				actuator_sp = actuator_sp + delta_T_Roll * aileron_sp;
 				if (aileron_sp < 0.0f) {
 					actuator_sp = math::constrain(actuator_sp, 0.0f, 1.0f + 2.0f * delta_T_Roll * aileron_sp);
@@ -1314,7 +1337,8 @@ ControlAllocator::apply_propulsive_control(float actuator_sp, int motor_idx, flo
 					actuator_sp = math::constrain(actuator_sp, 2.0f * delta_T_Roll * aileron_sp, 1.0f);
 				}
 			}
-			else if (motor_idx == 0) { // left side motor
+
+			else if (motor_idx == 2) { // left side motor: yaw
 				actuator_sp = actuator_sp + delta_T_Yaw * rudder_sp;
 				if (rudder_sp < 0.0f) { // left yaw
 					actuator_sp = math::constrain(actuator_sp, 0.0f, 1.0f + 2.0f * delta_T_Yaw * rudder_sp);
@@ -1322,13 +1346,17 @@ ControlAllocator::apply_propulsive_control(float actuator_sp, int motor_idx, flo
 					actuator_sp = math::constrain(actuator_sp, 2.0f * delta_T_Yaw * rudder_sp, 1.0f);
 				}
 			}
-			else if (motor_idx == 5) { // right side motor
+			else if (motor_idx == 3) { // right side motor: yaw
 				actuator_sp = actuator_sp - delta_T_Yaw * rudder_sp;
 				if (rudder_sp > 0.0f) {
 					actuator_sp = math::constrain(actuator_sp, 0.0f, 1.0f - 2.0f * delta_T_Yaw * rudder_sp);
 				} else if (rudder_sp < 0.0f) {
 					actuator_sp = math::constrain(actuator_sp, - 2.0f * delta_T_Yaw * rudder_sp, 1.0f);
 				}
+			}
+
+			if (fabsf(actuator_sp) < 0.005f) {
+				actuator_sp = 0.0f;
 			}
 			break;
 		default:
@@ -1345,7 +1373,18 @@ ControlAllocator::check_for_motor_failures()
 
 	if ((FailureMode)_param_ca_failure_mode.get() > FailureMode::IGNORE
 	    && _failure_detector_status_sub.update(&failure_detector_status)) {
-		if (failure_detector_status.fd_motor) {
+
+			// Switch Master failure injection
+			if (_failure_bitmask != _param_failure_injection_bitmask.get()) {
+				_failure_bitmask = (uint16_t)_param_failure_injection_bitmask.get();
+				PX4_INFO("Failure Injection Bitmask from Params: %d", _failure_bitmask);
+			}
+			if (_failure_bitmask != 0) {
+				//failure_detector_status.fd_motor = true;
+				failure_detector_status.motor_failure_mask |= _failure_bitmask;
+			}
+
+		if (failure_detector_status.motor_failure_mask != 0) {
 
 			if (_handled_motor_failure_bitmask != failure_detector_status.motor_failure_mask) {
 				// motor failure bitmask changed
