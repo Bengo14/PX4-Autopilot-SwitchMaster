@@ -278,6 +278,7 @@ private:
 		(ParamFloat<px4::params::DELTA_T_R_NO_CS>) _param_delta_t_roll_no_cs,
 		(ParamFloat<px4::params::DELTA_T_Y_NO_CS>) _param_delta_t_yaw_no_cs,
 		(ParamInt<px4::params::WORKING_MODE>) _param_prop_control_working_mode,
+		(ParamInt<px4::params::FAILURE_MODE>) _param_prop_control_failure_mode,
 		(ParamInt<px4::params::MOT_FAIL_INJ>) _param_failure_injection_bitmask
 	)
 

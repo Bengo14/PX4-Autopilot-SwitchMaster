@@ -1017,12 +1017,12 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 
 	updateParams(); // update changed params from storage (Switch Master)
 
-	// ---- Switch Master Propulsive Control (ITC/CTC) ----
+	// ---- Switch Master Propulsive Control (CTC/ITC) ----
 
-	if (_handled_motor_failure_bitmask != 0 && _working_mode != WorkingModePropControl::PROP_CONTROL_CS) {
-		// always use propulsive control and control surfaces if there are failed motors
-		_working_mode = WorkingModePropControl::PROP_CONTROL_CS;
-		PX4_INFO("Individual Thrust Control: With Control Surfaces");
+	if (_handled_motor_failure_bitmask != 0 && _working_mode != _param_prop_control_failure_mode.get()) {
+		// switch to propulsive control failure mode
+		_working_mode = _param_prop_control_failure_mode.get();
+		PX4_INFO("Propulsive Control failure working mode activated");
 
 	} else if (_handled_motor_failure_bitmask == 0 && _working_mode != _param_prop_control_working_mode.get()) {
 		_working_mode = _param_prop_control_working_mode.get();

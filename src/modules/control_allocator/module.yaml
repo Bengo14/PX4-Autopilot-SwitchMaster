@@ -594,7 +594,7 @@ parameters:
               3: pitch 3-2-1-1
               4: roll 3-2-1-1
               5: yaw 3-2-1-1
-              6: roll + yaw doublet
+              6: roll + yaw doublets
               7: roll + yaw 3-2-1-1
               8: yaw + free + roll + free doublets
           default: 0
@@ -630,17 +630,29 @@ parameters:
           max: 2.0
           unit: s
           default: 0.5
-    - group: PROPULSIVE CONTROL
+    - group: ITC
       definitions:
         WORKING_MODE:
           description:
-            short: Propulsive control working mode
+            short: Propulsive Control (CTC/ITC) working mode
+            long: The working mode choice for Collective Thrust Control (CTC) and Individual Thrust Control (ITC)
           type: enum
           values:
             0: Multi Engine
             1: Single Engine
-            2: Propulsive Control with CS
-            3: Propulsive Control without CS
+            2: ITC with CS
+            3: ITC without CS
+          default: 0
+        FAILURE_MODE:
+          description:
+            short: Propulsive Control failure working mode
+            long: The failure working mode, to be activated when a motor failure occurs
+          type: enum
+          values:
+            0: Multi Engine
+            1: Single Engine
+            2: ITC with CS
+            3: ITC without CS
           default: 0
         MAX_DELTA_T_SE:
           description:
@@ -653,7 +665,7 @@ parameters:
           default: 0.2
         DELTA_T_R_NO_CS:
           description:
-            short: Delta thrust of a couple of electric motors for roll control, without control surfaces
+            short: Max delta thrust of a couple of electric motors for roll control, without control surfaces
           type: float
           decimal: 2
           increment: 0.01
@@ -662,7 +674,7 @@ parameters:
           default: 0.2
         DELTA_T_Y_NO_CS:
           description:
-            short: Delta thrust of one electric motor for yaw control, without control surfaces
+            short: Max delta thrust of one electric motor for yaw control, without control surfaces
           type: float
           decimal: 2
           increment: 0.01
@@ -671,7 +683,7 @@ parameters:
           default: 0.2
         DELTA_T_R_CS:
           description:
-            short: Delta thrust of a couple of electric motors for roll control, along with control surfaces
+            short: Max delta thrust of a couple of electric motors for roll control, along with control surfaces
           type: float
           decimal: 2
           increment: 0.01
@@ -680,7 +692,7 @@ parameters:
           default: 0.2
         DELTA_T_Y_CS:
           description:
-            short: Delta thrust of one electric motor for yaw control, along with control surfaces
+            short: Max delta thrust of one electric motor for yaw control, along with control surfaces
           type: float
           decimal: 2
           increment: 0.01
