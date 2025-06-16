@@ -1022,7 +1022,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 	if (_handled_motor_failure_bitmask != 0 && _working_mode != _param_prop_control_failure_mode.get()) {
 		// switch to propulsive control failure mode
 		_working_mode = _param_prop_control_failure_mode.get();
-		PX4_INFO("Propulsive Control failure working mode activated");
+		PX4_INFO("Propulsive Control failure working mode activated: %d", _working_mode);
 
 	} else if (_handled_motor_failure_bitmask == 0 && _working_mode != _param_prop_control_working_mode.get()) {
 		_working_mode = _param_prop_control_working_mode.get();
