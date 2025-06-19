@@ -483,31 +483,31 @@ ControlAllocator::Run()
 			_auto_control_stand_by_mode_switch_master_pub.publish(auto_control_stand_by_mode);
 
 			switch (_maneuver_index) {
-				case 0:
+				case (uint8_t)0:
 					PX4_INFO("EXECUTING PITCH DOUBLET...");
 					break;
-				case 1:
+				case (uint8_t)1:
 					PX4_INFO("EXECUTING ROLL DOUBLET...");
 					break;
-				case 2:
+				case (uint8_t)2:
 					PX4_INFO("EXECUTING YAW DOUBLET...");
 					break;
-				case 3:
+				case (uint8_t)3:
 					PX4_INFO("EXECUTING PITCH 3-2-1-1...");
 					break;
-				case 4:
+				case (uint8_t)4:
 					PX4_INFO("EXECUTING ROLL 3-2-1-1...");
 					break;
-				case 5:
+				case (uint8_t)5:
 					PX4_INFO("EXECUTING YAW 3-2-1-1...");
 					break;
-				case 6:
+				case (uint8_t)6:
 					PX4_INFO("EXECUTING ROLL + YAW DOUBLETS...");
 					break;
-				case 7:
+				case (uint8_t)7:
 					PX4_INFO("EXECUTING ROLL + YAW 3-2-1-1...");
 					break;
-				case 8:
+				case (uint8_t)8:
 					PX4_INFO("EXECUTING SEPARATED YAW + ROLL DOUBLETS...");
 					break;
 				default:
