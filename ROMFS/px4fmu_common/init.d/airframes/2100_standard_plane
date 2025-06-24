@@ -237,9 +237,6 @@ param set-default FW_MAN_TRIM_TIME 0.2000
 param set-default NPFG_DAMPING 0.6000
 param set-default ACT_MAX_RATE 10.0000
 
-param set-default DELTA_T_R_CS 0.1000
-param set-default DELTA_T_Y_CS 0.1000
-
 param set-default BAT1_R_INTERNAL -1.0000
 param set-default CA_SV_CS0_TRIM 0.0700
 param set-default CA_SV_CS2_TRIM 0.0700
@@ -266,11 +263,15 @@ param set-default PWM_MAIN_MAX1 1850
 param set-default PWM_MAIN_MIN1 1100
 param set-default PWM_MAIN_MIN2 1170
 
+param set-default BAT1_V_LOAD_DROP 0.5000
 param set-default BAT1_V_CHARGED 4.1000
-param set-default BAT1_V_LOAD_DROP 0.4000
 param set-default FW_MAN_AMPLITUDE 0.2000
 param set-default FW_MAN_DURATION 6.0000
 param set-default FW_MAN_PERIOD 0.8000
 param set-default FW_MAN_TEST_IDX 8
 param set-default FW_MAN_TYPE 8
 param set-default FW_MIDDLE_DELAY 0.3000
+
+param set-default DELTA_T_R_CS 0.3000
+param set-default DELTA_T_R_NO_CS 0.4000
+param set-default DELTA_T_Y_NO_CS 0.5000
