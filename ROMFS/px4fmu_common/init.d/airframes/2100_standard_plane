@@ -91,7 +91,6 @@ param set-default ASPD_DO_CHECKS 3
 
 param set-default BAT1_N_CELLS 4
 param set-default BAT1_CAPACITY 8000.0000
-param set-default BAT1_V_CHARGED 4.0000
 param set-default BAT1_V_EMPTY 3.5000
 param set-default BAT_AVRG_CURRENT 20.0000
 
@@ -220,11 +219,8 @@ param set-default FW_GAMMA4_CLIMB 30.0000
 param set-default FW_GAMMA4_SINK -1.0000
 param set-default FW_GAMMA6_CLIMB 40.0000
 param set-default FW_GAMMA6_SINK 5.0000
-param set-default FW_MAN_AMPLITUDE -0.2000
-param set-default FW_MAN_DURATION 4.5000
 param set-default FW_MAN_EN 1
 param set-default FW_MAN_GAMMA_ERR 2.0000
-param set-default FW_MAN_PERIOD 0.4000
 param set-default FW_MAN_VEL_ERR 0.4000
 param set-default FW_T_PTCH_DAMP 0.1000
 param set-default FW_T_THR_DAMPING 0.1000
@@ -245,7 +241,6 @@ param set-default DELTA_T_R_CS 0.1000
 param set-default DELTA_T_Y_CS 0.1000
 
 param set-default BAT1_R_INTERNAL -1.0000
-param set-default BAT1_V_LOAD_DROP 0.3000
 param set-default CA_SV_CS0_TRIM 0.0700
 param set-default CA_SV_CS2_TRIM 0.0700
 param set-default CA_SV_CS3_TRIM 0.1200
@@ -270,3 +265,12 @@ param set-default PWM_MAIN_DIS6 1520
 param set-default PWM_MAIN_MAX1 1850
 param set-default PWM_MAIN_MIN1 1100
 param set-default PWM_MAIN_MIN2 1170
+
+param set-default BAT1_V_CHARGED 4.1000
+param set-default BAT1_V_LOAD_DROP 0.4000
+param set-default FW_MAN_AMPLITUDE 0.2000
+param set-default FW_MAN_DURATION 6.0000
+param set-default FW_MAN_PERIOD 0.8000
+param set-default FW_MAN_TEST_IDX 8
+param set-default FW_MAN_TYPE 8
+param set-default FW_MIDDLE_DELAY 0.3000
