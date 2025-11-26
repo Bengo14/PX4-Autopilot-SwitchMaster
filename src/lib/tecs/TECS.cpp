@@ -381,10 +381,14 @@ float TECSControl::_calcAltitudeControlOutput(const Setpoint &setpoint, const In
 			PX4_INFO("GLIDE MODE OFF");
 		}
 
-		// safe value to be ignored by TECS in glide mode (see function _updateSpeedAltitudeWeights)
-		// also good enough in normal flight
-		altitude_rate_output = (setpoint.altitude_reference.alt - input.altitude) * param.altitude_error_gain;
-		altitude_rate_output = math::constrain(altitude_rate_output, -param.target_sinkrate, param.target_climbrate);
+		if (_glide_mode) {
+			altitude_rate_output = - param.min_sink_rate; // minimum sink rate in glide mode
+			// then, E_sp = E_min and E_err < 0 and T_pred = 0
+		} else {
+			// good enough in normal flight
+			altitude_rate_output = (setpoint.altitude_reference.alt - input.altitude) * param.altitude_error_gain;
+			altitude_rate_output = math::constrain(altitude_rate_output, -param.target_sinkrate, param.target_climbrate);
+		}
 	}
 
 	return altitude_rate_output;
@@ -402,7 +406,7 @@ TECSControl::SpecificEnergyRates TECSControl::_calcSpecificEnergyRates(const Alt
 
 	// Calculate specific energy rates in units of (m**2/sec**3)
 	specific_energy_rates.spe_rate.estimate = input.altitude_rate * CONSTANTS_ONE_G; // potential energy rate of change
-	specific_energy_rates.ske_rate.estimate = input.tas * input.tas_rate;// kinetic energy rate of change
+	specific_energy_rates.ske_rate.estimate = input.tas * input.tas_rate; // kinetic energy rate of change
 
 	return specific_energy_rates;
 }
@@ -437,8 +441,8 @@ TECSControl::SpecificEnergyWeighting TECSControl::_updateSpeedAltitudeWeights(co
 	// Calculate the weight applied to control of specific kinetic energy error
 	float pitch_speed_weight = constrain(param.pitch_speed_weight, 0.0f, 2.0f);
 
-	if (_glide_mode) {		// Switch Master glide mode activation
-		pitch_speed_weight = 2.0f;
+	if (_glide_mode) {	// Switch Master glide mode activation
+		pitch_speed_weight = 2.0f; // in glide mode, consider only speed control
 	}
 
 	if (_ratio_undersped > FLT_EPSILON && flag.airspeed_enabled) {
@@ -446,7 +450,6 @@ TECSControl::SpecificEnergyWeighting TECSControl::_updateSpeedAltitudeWeights(co
 
 	} else if (!flag.airspeed_enabled) {
 		pitch_speed_weight = 0.0f;
-
 	}
 
 	// don't allow any weight to be larger than one, as it has the same effect as reducing the control
@@ -494,12 +497,11 @@ TECSControl::ControlValues TECSControl::_calcPitchControlSebRate(const SpecificE
 	 * rises above the demanded value, the pitch angle demand is increased by the TECS controller to prevent the vehicle overspeeding.
 	 * The weighting can be adjusted between 0 and 2 depending on speed and altitude accuracy requirements.
 	*/
-	seb_rate.setpoint = specific_energy_rates.spe_rate.setpoint * weight.spe_weighting -
-			    specific_energy_rates.ske_rate.setpoint *
-			    weight.ske_weighting;
+	seb_rate.setpoint = specific_energy_rates.spe_rate.setpoint * weight.spe_weighting - 
+						specific_energy_rates.ske_rate.setpoint * weight.ske_weighting;
 
-	seb_rate.estimate = (specific_energy_rates.spe_rate.estimate * weight.spe_weighting) -
-			    (specific_energy_rates.ske_rate.estimate * weight.ske_weighting);
+	seb_rate.estimate = specific_energy_rates.spe_rate.estimate * weight.spe_weighting -
+			    		specific_energy_rates.ske_rate.estimate * weight.ske_weighting;
 
 	return seb_rate;
 }
@@ -582,7 +584,13 @@ void TECSControl::_calcThrottleControl(float dt, const SpecificEnergyRates &spec
 	const STERateLimit limit{_calculateTotalEnergyRateLimit(param)};
 
 	// Update STE rate estimate LP filter
-	const float STE_rate_estimate_raw = specific_energy_rates.spe_rate.estimate + specific_energy_rates.ske_rate.estimate;
+	float STE_rate_estimate_raw;
+
+	if (_glide_mode) {
+		STE_rate_estimate_raw = specific_energy_rates.spe_rate.estimate; // in glide mode, only potential energy rate
+	} else {
+		STE_rate_estimate_raw = specific_energy_rates.spe_rate.estimate + specific_energy_rates.ske_rate.estimate;
+	}
 	_ste_rate_estimate_filter.setParameters(dt, param.ste_rate_time_const);
 	_ste_rate_estimate_filter.update(STE_rate_estimate_raw);
 
@@ -599,9 +607,9 @@ void TECSControl::_calcThrottleControl(float dt, const SpecificEnergyRates &spec
 	_throttle_setpoint = constrain(throttle_setpoint, param.throttle_min, param.throttle_max);
 
 	// Switch Master glide mode activation
-	if (_glide_mode) {
+	/*if (_glide_mode) {
 		_throttle_setpoint = 0.0f;
-	}
+	}*/
 
 	// Debug output
 	_debug_output.total_energy_rate_estimate = ste_rate.estimate;
@@ -615,7 +623,12 @@ TECSControl::ControlValues TECSControl::_calcThrottleControlSteRate(const STERat
 {
 	// Output ste rate values
 	ControlValues ste_rate;
-	ste_rate.setpoint = specific_energy_rates.spe_rate.setpoint + specific_energy_rates.ske_rate.setpoint;
+
+	if (_glide_mode) {
+		ste_rate.setpoint = specific_energy_rates.spe_rate.setpoint; // in glide mode, only potential energy rate
+	} else {
+		ste_rate.setpoint = specific_energy_rates.spe_rate.setpoint + specific_energy_rates.ske_rate.setpoint;
+	}
 
 	// Adjust the demanded total energy rate to compensate for induced drag rise in turns.
 	// Assume induced drag scales linearly with normal load factor.
