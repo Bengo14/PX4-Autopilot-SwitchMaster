@@ -298,9 +298,12 @@ ControlAllocator::update_effectiveness_source()
 
 void
 ControlAllocator::end_maneuver() {
+	// Reset maneuver state
 	_man_enabled = false;
 	_man_starting_time = 0;
+	_is_longitudinal_man = false;
 	PX4_INFO("--- MANEUVER ENDED ---");
+	// Stand by mode interruption
 	auto_control_stand_by_mode_switch_master_s auto_control_stand_by_mode;
 	auto_control_stand_by_mode.enabled = false;
 	_auto_control_stand_by_mode_switch_master_pub.publish(auto_control_stand_by_mode);
@@ -485,6 +488,7 @@ ControlAllocator::Run()
 			switch (_maneuver_index) {
 				case (uint8_t)0:
 					PX4_INFO("EXECUTING PITCH DOUBLET...");
+					_is_longitudinal_man = true;
 					break;
 				case (uint8_t)1:
 					PX4_INFO("EXECUTING ROLL DOUBLET...");
@@ -494,6 +498,7 @@ ControlAllocator::Run()
 					break;
 				case (uint8_t)3:
 					PX4_INFO("EXECUTING PITCH 3-2-1-1...");
+					_is_longitudinal_man = true;
 					break;
 				case (uint8_t)4:
 					PX4_INFO("EXECUTING ROLL 3-2-1-1...");
@@ -1146,11 +1151,11 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 				}
 			}
 
-			// ---- Switch Master maneuver ----
+			// ---- Switch Master maneuver execution ----
 
 			if (exec_maneuver) {
 
-				if (servos_idx == 0) {
+				if (!_is_longitudinal_man && servos_idx == 0) {
 					if (!_offsets.offset_computed_a) {
 						_offsets.offset_a = 0.0f;
 						for (int i = 0; i < WINDOW_SIZE; i++) {
@@ -1169,7 +1174,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 					actuator_sp = _offsets.offset_a + roll / 2.f;
 				}
 
-				else if (servos_idx == 1) {
+				else if (!_is_longitudinal_man && servos_idx == 1) {
 					actuator_sp = - (_offsets.offset_a + roll / 2.f);
 				}
 
@@ -1217,49 +1222,38 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 					} else {
 						_actuators_latest_samples[servos_idx][_counter] = actuator_sp;
 					}
-					if (_offsets.offset_computed_a) {
-						_offsets.offset_computed_a = false;
-					}
 				}
 
 				else if (servos_idx == 2) {
 
-					// elevator max rate
-					const hrt_abstime now = hrt_absolute_time();
+					// elevator max rate (deprecated)
+					/*const hrt_abstime now = hrt_absolute_time();
 					float delta_time = (now - _prev_time) / 1e6f;
 					_prev_time = now;
 					float rate = _param_act_max_rate.get();
 					float max_var = rate * delta_time;
-					max_var = math::constrain(max_var, 0.0004f, 0.04f);
+					max_var = math::constrain(max_var, 0.0004f, 0.04f);*/
 
-					if (_counter == -1) { // initialized to -1 (otherwise the starting value is out of bounds)
+					if (_counter == -1) { // initialized to -1
 						_counter++;
-						_actuators_latest_samples[servos_idx][WINDOW_SIZE - 1] = actuator_sp;
+						//_actuators_latest_samples[servos_idx][WINDOW_SIZE - 1] = actuator_sp;
 					}
-					int prev = _counter == 0 ? WINDOW_SIZE - 1 : _counter - 1;
+					//int prev = _counter == 0 ? WINDOW_SIZE - 1 : _counter - 1;
 
-					if (PX4_ISFINITE(_actuators_latest_samples[servos_idx][prev])) {
+					/*if (PX4_ISFINITE(_actuators_latest_samples[servos_idx][prev])) {
 						actuator_sp = math::constrain(actuator_sp, _actuators_latest_samples[servos_idx][prev] - max_var, _actuators_latest_samples[servos_idx][prev] + max_var);
 						actuator_sp = math::constrain(actuator_sp, -1.0f, 1.0f);
-					}
-					// printf("max var: %f, prev: %d, counter: %d, sp: %f, prev_sp: %f\n", (double)max_var, prev, _counter, (double)actuator_sp, (double)_actuators_latest_samples[servos_idx][prev]);
+					}*/
 					// update circular array with new sample
 					_actuators_latest_samples[servos_idx][_counter] = actuator_sp;
-					if (_offsets.offset_computed_e) {
-						_offsets.offset_computed_e = false;
-					}
 				}
 
 				else if (servos_idx == 3) {
 					// update circular array with new sample
-					_actuators_latest_samples[servos_idx][_counter] = actuator_sp;
-					if (_offsets.offset_computed_r) {
-						_offsets.offset_computed_r = false;
-					}
-					// counter increase and reset
-					_counter++;
-					if (_counter == WINDOW_SIZE) {
-						_counter = 0;
+					if (_counter == -1) {
+						_actuators_latest_samples[servos_idx][0] = actuator_sp;
+					} else {
+						_actuators_latest_samples[servos_idx][_counter] = actuator_sp;
 					}
 				} 
 				else {
@@ -1270,6 +1264,26 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 			actuator_servos.control[servos_idx] = PX4_ISFINITE(actuator_sp) ? actuator_sp : NAN;
 			++actuator_idx_matrix[selected_matrix];
 			++actuator_idx;
+		}
+
+		// counter increase and reset (one time per function call)
+		if (!exec_maneuver) {
+			if (_counter == -1) { // initialized to -1
+				_counter++;
+			}
+			_counter++;
+			if (_counter == WINDOW_SIZE) {
+				_counter = 0;
+			}
+			if (_offsets.offset_computed_a) {
+				_offsets.offset_computed_a = false;
+			}
+			if (_offsets.offset_computed_e) {
+				_offsets.offset_computed_e = false;
+			}
+			if (_offsets.offset_computed_r) {
+				_offsets.offset_computed_r = false;
+			}
 		}
 
 		for (int i = servos_idx; i < actuator_servos_s::NUM_CONTROLS; i++) {

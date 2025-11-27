@@ -235,6 +235,7 @@ private:
 	float _man_period, _man_duration, _man_amplitude, _man_delay, _middle_delay;
 	bool _man_test_switch_state{false};
 	bool _man_enabled{false};
+	bool _is_longitudinal_man{false};
 	int _working_mode{0};
 	uint16_t _failure_bitmask{0};
 
