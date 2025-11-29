@@ -195,11 +195,10 @@ param set-default FW_T_ALT_TC 2.5000
 param set-default FW_T_CLMB_MAX 15.0000
 param set-default FW_T_CLMB_R_SP 5.0000
 param set-default FW_T_I_GAIN_PIT 0.3000
-param set-default FW_T_PTCH_DAMP 0.1000
+param set-default FW_T_PTCH_DAMP 0.2000
 param set-default FW_T_SINK_MAX 10.0000
 param set-default FW_T_SINK_MIN 10.0000
 param set-default FW_T_SINK_R_SP 5.0000
-param set-default FW_T_STE_R_TC 0.1000
 param set-default FW_T_TAS_TC 2.0000
 param set-default FW_T_THR_INTEG 0.2500
 param set-default NAV_FW_ALTL_RAD 10.0000
@@ -210,9 +209,9 @@ param set-default FW_LND_FLALT 1.0000
 param set-default FW_LND_TD_OFF 5.0000
 param set-default FW_LND_THRTC_SC 0.8000
 param set-default FW_PN_R_SLEW_MAX 30.0000
-param set-default FW_T_SEB_R_FF 1.0000
-param set-default FW_T_THR_DAMPING 0.2000
+param set-default FW_T_THR_DAMPING 0.2500
 param set-default FW_T_VERT_ACC 4.0000
+param set-default FW_T_SEB_R_FF 0.7000
 
 param set-default BAT1_R_INTERNAL 0.0200
 param set-default BAT1_V_EMPTY 3.0000
@@ -245,13 +244,12 @@ param set-default FW_GAMMA6_SINK 5.0000
 param set-default FW_MAN_EN 1
 param set-default FW_MAN_GAMMA_ERR 2.0000
 param set-default FW_MAN_VEL_ERR 0.4000
-param set-default FW_MAN_AMPLITUDE 0.1000
 param set-default FW_MAN_DURATION 7.0000
 param set-default FW_MAN_PERIOD 1.0000
 param set-default FW_MAN_TEST_IDX 8
 param set-default FW_MAN_TYPE 8
 param set-default FW_MIN_WP_DIST 300.0000
-param set-default ACT_MAX_RATE 5.0000
+param set-default FW_MAN_AMPLITUDE 0.0500
 
 param set-default NAV_DLL_ACT 0
 param set-default NAV_RCL_ACT 1
