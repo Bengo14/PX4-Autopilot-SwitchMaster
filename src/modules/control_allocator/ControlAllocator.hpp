@@ -236,6 +236,7 @@ private:
 	bool _man_test_switch_state{false};
 	bool _man_enabled{false};
 	bool _is_longitudinal_man{false};
+	bool _free_ailerons{false};
 	int _working_mode{0};
 	uint16_t _failure_bitmask{0};
 
@@ -272,6 +273,7 @@ private:
 		(ParamInt<px4::params::FW_MAN_TEST_IDX>) _param_man_test_idx,
 		(ParamFloat<px4::params::FW_MAN_DELAY>) _param_man_delay,
 		(ParamFloat<px4::params::FW_MIDDLE_DELAY>) _param_middle_delay,
+		(ParamInt<px4::params::FREE_AILERONS>) _param_free_ailerons,
 		(ParamFloat<px4::params::ACT_MAX_RATE>) _param_act_max_rate,
 		(ParamFloat<px4::params::MAX_DELTA_T_SE>) _param_max_delta_t_se,
 		(ParamFloat<px4::params::DELTA_T_R_CS>) _param_delta_t_roll_cs,

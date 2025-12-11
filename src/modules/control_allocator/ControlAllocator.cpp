@@ -479,6 +479,7 @@ ControlAllocator::Run()
 			_man_period = _param_man_period.get();
 			_man_delay = _param_man_delay.get();
 			_middle_delay = _param_middle_delay.get();
+			_free_ailerons = _param_free_ailerons.get();
 
 			// Switch Master stand by mode trigger
 			auto_control_stand_by_mode_switch_master_s auto_control_stand_by_mode;
@@ -1155,7 +1156,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 
 			if (exec_maneuver) {
 
-				if (!_is_longitudinal_man && servos_idx == 0) {
+				if ((!_is_longitudinal_man || (_is_longitudinal_man && !_free_ailerons)) && servos_idx == 0) {
 					if (!_offsets.offset_computed_a) {
 						_offsets.offset_a = 0.0f;
 						for (int i = 0; i < WINDOW_SIZE; i++) {
@@ -1174,7 +1175,7 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 					actuator_sp = _offsets.offset_a + roll / 2.f;
 				}
 
-				else if (!_is_longitudinal_man && servos_idx == 1) {
+				else if ((!_is_longitudinal_man || (_is_longitudinal_man && !_free_ailerons)) && servos_idx == 1) {
 					actuator_sp = - (_offsets.offset_a + roll / 2.f);
 				}
 

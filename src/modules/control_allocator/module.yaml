@@ -585,7 +585,7 @@ parameters:
           default: 0
         FW_MAN_TEST_IDX:
           description:
-            short: Select the maneuver to be tested.
+            short: Select the maneuver to be tested
           type: enum
           values:
               0: pitch doublet
@@ -611,7 +611,7 @@ parameters:
           default: 1.0
         FW_MAN_DELAY:
           description:
-            short: Delay before the maneuver starts, in seconds, while actuators are blocked.
+            short: Delay before the maneuver starts, in seconds, while actuators are blocked
           type: float
           decimal: 1
           increment: 0.1
@@ -630,6 +630,11 @@ parameters:
           max: 2.0
           unit: s
           default: 0.5
+        FREE_AILERONS:
+          description:
+            short: Keep ailerons controlled by the AP during longitudinal maneuvers
+          type: boolean
+          default: 0
     - group: ITC
       definitions:
         WORKING_MODE:
