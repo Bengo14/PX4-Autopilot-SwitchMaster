@@ -230,17 +230,6 @@ param set-default RTL_TIME_MARGIN 0
 param set-default RTL_TYPE 0
 param set-default NPFG_SW_DST_MLT 0.2000
 
-param set-default FW_GAMMA1_CLIMB 20.0000
-param set-default FW_GAMMA1_SINK 15.0000
-param set-default FW_GAMMA2_CLIMB 30.0000
-param set-default FW_GAMMA2_SINK -1.0000
-param set-default FW_GAMMA3_CLIMB 20.0000
-param set-default FW_GAMMA3_SINK 15.0000
-param set-default FW_GAMMA5_CLIMB 40.0000
-param set-default FW_GAMMA5_SINK 5.0000
-param set-default FW_GAMMA6_CLIMB 0.0000
-param set-default FW_GAMMA6_SINK 5.0000
-
 param set-default FW_MAN_EN 1
 param set-default FW_MAN_GAMMA_ERR 2.0000
 param set-default FW_MAN_VEL_ERR 0.4000

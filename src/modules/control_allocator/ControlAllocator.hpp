@@ -274,7 +274,7 @@ private:
 		(ParamFloat<px4::params::FW_MAN_DELAY>) _param_man_delay,
 		(ParamFloat<px4::params::FW_MIDDLE_DELAY>) _param_middle_delay,
 		(ParamInt<px4::params::FREE_AILERONS>) _param_free_ailerons,
-		(ParamFloat<px4::params::ACT_MAX_RATE>) _param_act_max_rate,
+		//(ParamFloat<px4::params::ACT_MAX_RATE>) _param_act_max_rate,
 		(ParamFloat<px4::params::MAX_DELTA_T_SE>) _param_max_delta_t_se,
 		(ParamFloat<px4::params::DELTA_T_R_CS>) _param_delta_t_roll_cs,
 		(ParamFloat<px4::params::DELTA_T_Y_CS>) _param_delta_t_yaw_cs,

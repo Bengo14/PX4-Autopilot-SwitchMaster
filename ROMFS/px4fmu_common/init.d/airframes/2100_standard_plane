@@ -262,20 +262,6 @@ param set-default DELTA_T_R_NO_CS 0.4000
 param set-default DELTA_T_Y_NO_CS 0.5000
 param set-default DELTA_T_Y_CS 0.2000
 
-param set-default ACT_MAX_RATE 1.0000
-
-param set-default FW_GAMMA1_CLIMB 20.0000
-param set-default FW_GAMMA1_SINK 15.0000
-param set-default FW_GAMMA2_CLIMB 30.0000
-param set-default FW_GAMMA2_SINK -1.0000
-param set-default FW_GAMMA3_CLIMB 20.0000
-param set-default FW_GAMMA3_SINK 15.0000
-param set-default FW_GAMMA4_CLIMB 10.0000
-param set-default FW_GAMMA4_SINK 10.0000
-param set-default FW_GAMMA5_CLIMB 40.0000
-param set-default FW_GAMMA5_SINK 5.0000
-param set-default FW_GAMMA6_CLIMB 0.0000
-param set-default FW_GAMMA6_SINK 5.0000
 param set-default FW_MAN_AMPLITUDE -0.2000
 param set-default FW_MAN_EN 1
 param set-default FW_MAN_PERIOD 0.5000

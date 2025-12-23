@@ -598,17 +598,17 @@ parameters:
               7: roll + yaw 3-2-1-1
               8: yaw + free + roll + free doublets
           default: 0
-        ACT_MAX_RATE:
-          description:
-            short: Max rate of elevator in units/s
-            long: Max rate of elevator in units/s. One unit is half of the actuator range.
-          type: float
-          decimal: 1
-          increment: 0.1
-          min: 0.1
-          max: 10.0
-          unit: 1/s
-          default: 1.0
+        #ACT_MAX_RATE:
+          #description:
+            #short: Max rate of elevator in units/s
+            #long: Max rate of elevator in units/s. One unit is half of the actuator range.
+          #type: float
+          #decimal: 1
+          #increment: 0.1
+          #min: 0.1
+          #max: 10.0
+          #unit: 1/s
+          #default: 1.0
         FW_MAN_DELAY:
           description:
             short: Delay before the maneuver starts, in seconds, while actuators are blocked

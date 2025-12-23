@@ -752,7 +752,7 @@ PARAM_DEFINE_FLOAT(FW_T_SINK_R_SP, 2.0f);
  * @increment 0.1
  * @group SM MANEUVERS
  */
-PARAM_DEFINE_FLOAT(FW_GAMMA1_CLIMB, 10.0f);
+//PARAM_DEFINE_FLOAT(FW_GAMMA1_CLIMB, 10.0f);
 
 /**
  * Gamma setpoint sink mode
@@ -768,7 +768,7 @@ PARAM_DEFINE_FLOAT(FW_GAMMA1_CLIMB, 10.0f);
  * @increment 0.1
  * @group SM MANEUVERS
  */
-PARAM_DEFINE_FLOAT(FW_GAMMA1_SINK, 10.0f);
+//PARAM_DEFINE_FLOAT(FW_GAMMA1_SINK, 10.0f);
 
 /**
  * Gamma setpoint climb mode
@@ -783,7 +783,7 @@ PARAM_DEFINE_FLOAT(FW_GAMMA1_SINK, 10.0f);
  * @increment 0.1
  * @group SM MANEUVERS
  */
-PARAM_DEFINE_FLOAT(FW_GAMMA2_CLIMB, 10.0f);
+//PARAM_DEFINE_FLOAT(FW_GAMMA2_CLIMB, 10.0f);
 
 /**
  * Gamma setpoint sink mode
@@ -799,7 +799,7 @@ PARAM_DEFINE_FLOAT(FW_GAMMA2_CLIMB, 10.0f);
  * @increment 0.1
  * @group SM MANEUVERS
  */
-PARAM_DEFINE_FLOAT(FW_GAMMA2_SINK, 10.0f);
+//PARAM_DEFINE_FLOAT(FW_GAMMA2_SINK, 10.0f);
 
 /**
  * Gamma setpoint climb mode
@@ -814,7 +814,7 @@ PARAM_DEFINE_FLOAT(FW_GAMMA2_SINK, 10.0f);
  * @increment 0.1
  * @group SM MANEUVERS
  */
-PARAM_DEFINE_FLOAT(FW_GAMMA3_CLIMB, 10.0f);
+//PARAM_DEFINE_FLOAT(FW_GAMMA3_CLIMB, 10.0f);
 
 /**
  * Gamma setpoint sink mode
@@ -830,7 +830,7 @@ PARAM_DEFINE_FLOAT(FW_GAMMA3_CLIMB, 10.0f);
  * @increment 0.1
  * @group SM MANEUVERS
  */
-PARAM_DEFINE_FLOAT(FW_GAMMA3_SINK, 10.0f);
+//PARAM_DEFINE_FLOAT(FW_GAMMA3_SINK, 10.0f);
 
 /**
  * Gamma setpoint climb mode
@@ -845,7 +845,7 @@ PARAM_DEFINE_FLOAT(FW_GAMMA3_SINK, 10.0f);
  * @increment 0.1
  * @group SM MANEUVERS
  */
-PARAM_DEFINE_FLOAT(FW_GAMMA4_CLIMB, 10.0f);
+//PARAM_DEFINE_FLOAT(FW_GAMMA4_CLIMB, 10.0f);
 
 /**
  * Gamma setpoint sink mode
@@ -861,7 +861,7 @@ PARAM_DEFINE_FLOAT(FW_GAMMA4_CLIMB, 10.0f);
  * @increment 0.1
  * @group SM MANEUVERS
  */
-PARAM_DEFINE_FLOAT(FW_GAMMA4_SINK, 10.0f);
+//PARAM_DEFINE_FLOAT(FW_GAMMA4_SINK, 10.0f);
 
 /**
  * Gamma setpoint climb mode
@@ -876,7 +876,7 @@ PARAM_DEFINE_FLOAT(FW_GAMMA4_SINK, 10.0f);
  * @increment 0.1
  * @group SM MANEUVERS
  */
-PARAM_DEFINE_FLOAT(FW_GAMMA5_CLIMB, 10.0f);
+//PARAM_DEFINE_FLOAT(FW_GAMMA5_CLIMB, 10.0f);
 
 /**
  * Gamma setpoint sink mode
@@ -892,7 +892,7 @@ PARAM_DEFINE_FLOAT(FW_GAMMA5_CLIMB, 10.0f);
  * @increment 0.1
  * @group SM MANEUVERS
  */
-PARAM_DEFINE_FLOAT(FW_GAMMA5_SINK, 10.0f);
+//PARAM_DEFINE_FLOAT(FW_GAMMA5_SINK, 10.0f);
 
 /**
  * Gamma setpoint climb mode
@@ -907,7 +907,7 @@ PARAM_DEFINE_FLOAT(FW_GAMMA5_SINK, 10.0f);
  * @increment 0.1
  * @group SM MANEUVERS
  */
-PARAM_DEFINE_FLOAT(FW_GAMMA6_CLIMB, 10.0f);
+//PARAM_DEFINE_FLOAT(FW_GAMMA6_CLIMB, 10.0f);
 
 /**
  * Gamma setpoint sink mode
@@ -923,7 +923,7 @@ PARAM_DEFINE_FLOAT(FW_GAMMA6_CLIMB, 10.0f);
  * @increment 0.1
  * @group SM MANEUVERS
  */
-PARAM_DEFINE_FLOAT(FW_GAMMA6_SINK, 10.0f);
+//PARAM_DEFINE_FLOAT(FW_GAMMA6_SINK, 10.0f);
 
 /**
  * Min delta distance for gamma setpoint

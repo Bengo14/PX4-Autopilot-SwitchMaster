@@ -1026,7 +1026,7 @@ FixedwingPositionControl::handle_setpoint_type(const position_setpoint_s &pos_sp
 		float dist_xy = -1.f;
 		float dist_z = -1.f;
 
-		const float dist = get_distance_to_point_global_wgs84(
+		const float _dist = get_distance_to_point_global_wgs84(
 					   (double)curr_wp(0), (double)curr_wp(1), pos_sp_curr.alt,
 					   _current_latitude, _current_longitude, _current_altitude,
 					   &dist_xy, &dist_z);
@@ -1034,7 +1034,7 @@ FixedwingPositionControl::handle_setpoint_type(const position_setpoint_s &pos_sp
 		// Achieve position setpoint altitude via loiter when laterally close to WP.
 		// Detect if system has switchted into a Loiter before (check _position_sp_type), and in that
 		// case remove the dist_xy check (not switch out of Loiter until altitude is reached).
-		if ((!_vehicle_status.in_transition_mode) && (dist >= 0.f)
+		if ((!_vehicle_status.in_transition_mode) && (_dist >= 0.f)
 		    && (dist_z > _param_nav_fw_alt_rad.get())
 		    && (dist_xy < acc_rad || _position_sp_type == position_setpoint_s::SETPOINT_TYPE_LOITER)) {
 
@@ -1092,9 +1092,9 @@ FixedwingPositionControl::control_auto_position(const float control_interval, co
 	_pos_sp_alt = pos_sp_curr.alt;
 	_prev_pos_sp_alt = pos_sp_prev.alt;
 	_height_rate_sp = NAN;
-	float min_wp_delta_dist = _param_min_wp_dist_gamma_sp.get(); // Switch Master gamma mode activation condition
-	float dist = get_distance_to_next_waypoint(pos_sp_prev.lat, pos_sp_prev.lon, pos_sp_curr.lat, pos_sp_curr.lon);
-	float target_tas = target_airspeed * _eas2tas;
+	float min_wp_delta_dist = _param_min_wp_dist_gamma_sp.get();
+	_wp_distance = get_distance_to_next_waypoint(pos_sp_prev.lat, pos_sp_prev.lon, pos_sp_curr.lat, pos_sp_curr.lon);
+	_target_tas = target_airspeed * _eas2tas;
 
 
 	if (_position_setpoint_previous_valid &&
@@ -1103,7 +1103,7 @@ FixedwingPositionControl::control_auto_position(const float control_interval, co
 	   ){
 		// ----- Switch Master project, FPA setpoint and glide mode modification, DAER Polimi -----
 
-		if (dist >= min_wp_delta_dist && (_pos_sp_alt - _prev_pos_sp_alt) >= 0) { // climb mode with gamma sp
+		if (_wp_distance >= min_wp_delta_dist && (_pos_sp_alt - _prev_pos_sp_alt) >= 0) { // climb mode with gamma sp
 
 			if (_glide_mode_enabled) {
 				enable_glide_mode(false);
@@ -1112,14 +1112,14 @@ FixedwingPositionControl::control_auto_position(const float control_interval, co
 				evaluate_gamma_and_start_time(true);
 			}
 
-			_height_rate_sp = target_tas * _sin_gamma; // fixed gamma setpoint to height rate setpoint
+			_height_rate_sp = _target_tas * _sin_gamma; // fixed gamma setpoint to height rate setpoint
 
 			safety_checks_maneuver_and_glide();
 
 			if (!_maneuver_started && !isZero(_airspeed_eas) && _param_man_enabled.get() && !_master_alarm) {
 
 				float sin_gamma_error = fabsf(_sin_gamma - (-_local_pos.vz / (_airspeed_eas * _eas2tas)));
-				float tas_error = fabsf(target_tas - (_airspeed_eas * _eas2tas));
+				float tas_error = fabsf(_target_tas - (_airspeed_eas * _eas2tas));
 				float trim_time = (hrt_absolute_time() - _start_time) / 1e6f; //[s]
 				float conditions_hold_time = (hrt_absolute_time() - _trim_clock) / 1e6f; //[s]
 
@@ -1134,13 +1134,13 @@ FixedwingPositionControl::control_auto_position(const float control_interval, co
 				}
 			}
 
-		} else if (dist >= min_wp_delta_dist && (_pos_sp_alt - _prev_pos_sp_alt) < 0) { // sink mode with gamma sp
+		} else if (_wp_distance >= min_wp_delta_dist && (_pos_sp_alt - _prev_pos_sp_alt) < 0) { // sink mode with gamma sp
 
 			if (!_gamma_evaluated) {
 				evaluate_gamma_and_start_time(false);
 			}
 
-			if (_sin_gamma < 0) {
+			if (_gamma_glide) {
 			// we are in glide mode
 			// height rate setpoint remains NAN and we have h setpoint equal to the altitude of the next wp
 
@@ -1152,7 +1152,7 @@ FixedwingPositionControl::control_auto_position(const float control_interval, co
 
 				if (!_maneuver_started && !isZero(_airspeed_eas) && _glide_mode_enabled && _param_man_enabled.get() && !_master_alarm) {
 
-					float tas_error = fabsf(target_tas - (_airspeed_eas * _eas2tas));
+					float tas_error = fabsf(_target_tas - (_airspeed_eas * _eas2tas));
 					float trim_time = (hrt_absolute_time() - _start_time) / 1e6f; //[s]
 					float conditions_hold_time = (hrt_absolute_time() - _trim_clock) / 1e6f; //[s]
 
@@ -1170,14 +1170,14 @@ FixedwingPositionControl::control_auto_position(const float control_interval, co
 					enable_glide_mode(false);
 				}
 
-				_height_rate_sp = - target_tas * _sin_gamma; // fixed gamma setpoint to height rate setpoint
+				_height_rate_sp = - _target_tas * _sin_gamma; // fixed gamma setpoint to height rate setpoint
 
 				safety_checks_maneuver_and_glide();
 
 				if (!_maneuver_started && !isZero(_airspeed_eas) && _param_man_enabled.get() && !_master_alarm) {
 
 					float sin_gamma_error = fabsf(_sin_gamma + (-_local_pos.vz / (_airspeed_eas * _eas2tas)));
-					float tas_error = fabsf(target_tas - (_airspeed_eas * _eas2tas));
+					float tas_error = fabsf(_target_tas - (_airspeed_eas * _eas2tas));
 					float trim_time = (hrt_absolute_time() - _start_time) / 1e6f; //[s]
 					float conditions_hold_time = (hrt_absolute_time() - _trim_clock) / 1e6f; //[s]
 
@@ -1229,7 +1229,7 @@ FixedwingPositionControl::control_auto_position(const float control_interval, co
 					const float grad = -delta_alt / (d_curr_prev - math::max(0.0f , fabsf(pos_sp_curr.loiter_radius)));
 					const float a = pos_sp_prev.alt - grad * d_curr_prev;
 
-					// altitude setpoint ranges linearly from pos_sp_prev.alt (at d_curr_prev dist) to pos_sp_curr.alt (at acc_rad dist)
+					// altitude setpoint ranges linearly from pos_sp_prev.alt (at d_curr_prev _dist) to pos_sp_curr.alt (at acc_rad _dist)
 					_pos_sp_alt = a + grad * _min_current_sp_distance_xy;
 				}
 			}
@@ -1252,7 +1252,7 @@ FixedwingPositionControl::control_auto_position(const float control_interval, co
 void
 FixedwingPositionControl::evaluate_gamma_and_start_time(bool climb_mode) {
 
-	int index = _counter / 2;
+	/*int index = _counter / 2;
 	char buffer[17];
 
 	if (climb_mode) {
@@ -1264,12 +1264,22 @@ FixedwingPositionControl::evaluate_gamma_and_start_time(bool climb_mode) {
 	float gamma_sp;
 	param_get(param, &gamma_sp);
 	_counter++;
-	_counter %= MAX_NUM_GAMMA;
+	_counter %= MAX_NUM_GAMMA;*/
 
+	float gamma_sp;
+	gamma_sp = degrees(atanf((_pos_sp_alt - _prev_pos_sp_alt) / (_wp_distance - 10.0f))); // positive in climb mode, negative in sink
+	gamma_sp = fabsf(gamma_sp);
+	gamma_sp = ceilf(gamma_sp);
+
+	if (!climb_mode && gamma_sp / _target_tas > 0.85f) { // glide activation condition based on simulations
+		_gamma_glide = true;
+	} else {
+		_gamma_glide = false;
+	}
+	
 	if (climb_mode) {
-		gamma_sp = fabsf(gamma_sp);
 		PX4_INFO("Gamma setpoint: %.1f", (double) gamma_sp);
-	} else if (gamma_sp >= 0) {
+	} else if (!_gamma_glide) {
 		PX4_INFO("Gamma setpoint: %.1f", (double) -gamma_sp);
 	}
 	_sin_gamma = sinf(radians(gamma_sp));

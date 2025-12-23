@@ -295,15 +295,18 @@ private:
 	bool _maneuver_started{false};
 	bool _gamma_evaluated{false};
 	bool _glide_mode_enabled{false};
+	bool _gamma_glide{false};
 	float _height_rate_sp;
 	float _sin_gamma{0};
 	float _pos_sp_alt;
 	float _prev_pos_sp_alt;
+	float _wp_distance;
+	float _target_tas;
 	hrt_abstime _start_time;
 	hrt_abstime _trim_clock;
-	int _counter{0};
+	//int _counter{0};
 	bool _master_alarm{false};
-	const int MAX_NUM_GAMMA{12};
+	//const int MAX_NUM_GAMMA{12};
 
 	enum ABORT_REASON {
 		KILL_SWITCH,
@@ -1019,7 +1022,7 @@ private:
 		(ParamFloat<px4::params::FW_T_SPD_PRC_STD>) _param_process_noise_standard_dev,
 
 		// Switch Master parameters
-		(ParamFloat<px4::params::FW_GAMMA1_CLIMB>) _param_gamma1_climb,
+		/*(ParamFloat<px4::params::FW_GAMMA1_CLIMB>) _param_gamma1_climb,
 		(ParamFloat<px4::params::FW_GAMMA1_SINK>) _param_gamma1_sink,
 		(ParamFloat<px4::params::FW_GAMMA2_CLIMB>) _param_gamma2_climb,
 		(ParamFloat<px4::params::FW_GAMMA2_SINK>) _param_gamma2_sink,
@@ -1030,7 +1033,7 @@ private:
 		(ParamFloat<px4::params::FW_GAMMA5_CLIMB>) _param_gamma5_climb,
 		(ParamFloat<px4::params::FW_GAMMA5_SINK>) _param_gamma5_sink,
 		(ParamFloat<px4::params::FW_GAMMA6_CLIMB>) _param_gamma6_climb,
-		(ParamFloat<px4::params::FW_GAMMA6_SINK>) _param_gamma6_sink,
+		(ParamFloat<px4::params::FW_GAMMA6_SINK>) _param_gamma6_sink,*/
 		(ParamFloat<px4::params::FW_MIN_WP_DIST>) _param_min_wp_dist_gamma_sp,
 		(ParamInt<px4::params::FW_MAN_TYPE>) _param_man_type,
 		(ParamFloat<px4::params::FW_MAN_VEL_ERR>) _param_man_vel_err,
