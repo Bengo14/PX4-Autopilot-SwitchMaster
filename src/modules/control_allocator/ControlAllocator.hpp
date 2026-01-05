@@ -226,7 +226,6 @@ private:
 	hrt_abstime _man_starting_time{0};
 	hrt_abstime _prev_time{0};
 
-	float _servos_last_update[MAX_NUM_SERVOS];
 	float _actuators_latest_samples[MAX_NUM_SERVOS][WINDOW_SIZE];
 	float _motors_latest_samples[MAX_NUM_MOTORS][WINDOW_SIZE];
 	int _counter{-1};

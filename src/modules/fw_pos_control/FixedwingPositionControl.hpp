@@ -307,6 +307,10 @@ private:
 	//int _counter{0};
 	bool _master_alarm{false};
 	//const int MAX_NUM_GAMMA{12};
+	bool _constant_bank_turn{false};
+	bool _turn_center_computed{false};
+	bool _direction_counter_clockwise{false};
+	Vector2f _turn_center{0.f, 0.f};
 
 	enum ABORT_REASON {
 		KILL_SWITCH,

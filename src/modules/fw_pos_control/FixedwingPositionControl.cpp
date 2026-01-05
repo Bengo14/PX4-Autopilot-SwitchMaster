@@ -1076,10 +1076,45 @@ FixedwingPositionControl::control_auto_position(const float control_interval, co
 
 	if (_position_setpoint_previous_valid && pos_sp_prev.type != position_setpoint_s::SETPOINT_TYPE_TAKEOFF) {
 		Vector2f prev_wp_local = _global_local_proj_ref.project(pos_sp_prev.lat, pos_sp_prev.lon);
-		navigateWaypoints(prev_wp_local, curr_wp_local, curr_pos_local, ground_speed, _wind_vel);
+
+		if (_constant_bank_turn) {
+			float loiter_radius = _param_nav_loiter_rad.get();
+
+			if (!_turn_center_computed) {
+				Vector2f direction_vector = (prev_wp_local - curr_pos_local);
+				direction_vector.normalize();
+				// rotazione di 90 gradi in senso orario in sistema di riferimento sinistrorso
+				direction_vector = Vector2f{-direction_vector(1), direction_vector(0)};
+				Vector2f path_vector = (curr_wp_local - prev_wp_local);
+				path_vector.normalize();
+				Vector2f sum = direction_vector + path_vector;
+				_direction_counter_clockwise = false;
+				
+				if (sum.norm() < sqrtf(2.0f)) {
+					direction_vector *= -1.0f; // rotazione 90 gradi senso antiorario rispetto alla direzione del rettilineo
+					_direction_counter_clockwise = true;
+				}
+				// turn center from current position
+				_turn_center = curr_pos_local + direction_vector * loiter_radius;
+				_turn_center_computed = true;
+				PX4_INFO("Turn center computed at [%.1f, %.1f], r = %.1f m", (double)_turn_center(0), (double)_turn_center(1), (double)loiter_radius);
+			}
+			navigateLoiter(_turn_center, curr_pos_local, loiter_radius, _direction_counter_clockwise, ground_speed, _wind_vel);
+
+		} else {
+			navigateWaypoints(prev_wp_local, curr_wp_local, curr_pos_local, ground_speed, _wind_vel);
+		}
 
 	} else {
 		navigateWaypoint(curr_wp_local, curr_pos_local, ground_speed, _wind_vel);
+		_constant_bank_turn = false;
+		_turn_center_computed = false;
+	}
+	// safety measure for distant waypoints (likely not a turn in GPS plan)
+	Vector2f d_next_wp = curr_wp_local - curr_pos_local;
+	if (d_next_wp.norm() > 60.0f) {
+		_constant_bank_turn = false;
+		_turn_center_computed = false;
 	}
 
 	_att_sp.roll_body = getCorrectedNpfgRollSetpoint();
@@ -1111,6 +1146,8 @@ FixedwingPositionControl::control_auto_position(const float control_interval, co
 			if (!_gamma_evaluated) {
 				evaluate_gamma_and_start_time(true);
 			}
+			_constant_bank_turn = false;
+			_turn_center_computed = false;
 
 			_height_rate_sp = _target_tas * _sin_gamma; // fixed gamma setpoint to height rate setpoint
 
@@ -1139,6 +1176,8 @@ FixedwingPositionControl::control_auto_position(const float control_interval, co
 			if (!_gamma_evaluated) {
 				evaluate_gamma_and_start_time(false);
 			}
+			_constant_bank_turn = false;
+			_turn_center_computed = false;
 
 			if (_gamma_glide) {
 			// we are in glide mode
@@ -1195,7 +1234,12 @@ FixedwingPositionControl::control_auto_position(const float control_interval, co
 
 		} else { // Altitude first order hold (FOH)
 
-			_gamma_evaluated = false;
+			if (_gamma_evaluated) {
+				_constant_bank_turn = true; // activate only after gamma mode
+				_turn_center_computed = false;
+				_gamma_evaluated = false;
+			}
+			
 			if (_maneuver_started) {
 				abort_maneuver(ABORT_REASON::HORIZONTAL_LIMIT);
 			}
@@ -1269,9 +1313,9 @@ FixedwingPositionControl::evaluate_gamma_and_start_time(bool climb_mode) {
 	float gamma_sp;
 	gamma_sp = degrees(atanf((_pos_sp_alt - _prev_pos_sp_alt) / (_wp_distance - 10.0f))); // positive in climb mode, negative in sink
 	gamma_sp = fabsf(gamma_sp);
-	gamma_sp = ceilf(gamma_sp);
+	gamma_sp = ceilf(gamma_sp); // approx to upper integer value
 
-	if (!climb_mode && gamma_sp / _target_tas > 0.85f) { // glide activation condition based on simulations
+	if (!climb_mode && gamma_sp / _target_tas > 0.9f) { // glide activation condition based on simulations
 		_gamma_glide = true;
 	} else {
 		_gamma_glide = false;

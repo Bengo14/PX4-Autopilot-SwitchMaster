@@ -267,3 +267,5 @@ param set-default FW_MAN_EN 1
 param set-default FW_MAN_PERIOD 0.5000
 param set-default FW_MAN_TEST_IDX 0
 param set-default FW_MAN_TYPE 0
+
+param set-default NAV_LOITER_RAD 55.0000

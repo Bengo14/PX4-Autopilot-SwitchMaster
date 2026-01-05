@@ -1209,9 +1209,6 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 						}
 					}
 					actuator_sp = _offsets.offset_r + yaw;
-				} 	
-				else {
-					actuator_sp = _servos_last_update[servos_idx];
 				}
 
 			} else {
@@ -1256,9 +1253,6 @@ ControlAllocator::publish_actuator_controls(bool exec_maneuver, float roll, floa
 					} else {
 						_actuators_latest_samples[servos_idx][_counter] = actuator_sp;
 					}
-				} 
-				else {
-					_servos_last_update[servos_idx] = actuator_sp;
 				}
 			}
 
