@@ -158,7 +158,7 @@ param set-default CA_ROTOR5_PY 0.8000
 param set-default FW_AIRSPD_MAX 25.0000
 param set-default FW_AIRSPD_MIN 10.0000
 param set-default FW_AIRSPD_STALL 9.0000
-param set-default FW_AIRSPD_TRIM 16.0000
+param set-default FW_AIRSPD_TRIM 18.0000
 param set-default FW_GND_SPD_MIN 5.0000
 param set-default FW_LND_ABORT 0
 param set-default FW_LND_AIRSPD 11.0000
@@ -190,17 +190,17 @@ param set-default FW_RR_P 0.1939
 param set-default FW_R_TC 0.2482
 
 param set-default FW_THR_SLEW_MAX 0.0000
-param set-default FW_THR_TRIM 0.5100
+param set-default FW_THR_TRIM 0.4500
 param set-default FW_T_ALT_TC 2.5000
 param set-default FW_T_CLMB_MAX 15.0000
 param set-default FW_T_CLMB_R_SP 5.0000
-param set-default FW_T_I_GAIN_PIT 0.3000
-param set-default FW_T_PTCH_DAMP 0.2000
+param set-default FW_T_I_GAIN_PIT 0.1500
+param set-default FW_T_PTCH_DAMP 0.1000
 param set-default FW_T_SINK_MAX 10.0000
 param set-default FW_T_SINK_MIN 10.0000
 param set-default FW_T_SINK_R_SP 5.0000
 param set-default FW_T_TAS_TC 2.0000
-param set-default FW_T_THR_INTEG 0.2500
+param set-default FW_T_THR_INTEG 0.1000
 param set-default NAV_FW_ALTL_RAD 10.0000
 param set-default NAV_FW_ALT_RAD 20.0000
 param set-default RWTO_ROT_AIRSPD 15.0000
@@ -209,7 +209,7 @@ param set-default FW_LND_FLALT 1.0000
 param set-default FW_LND_TD_OFF 5.0000
 param set-default FW_LND_THRTC_SC 0.8000
 param set-default FW_PN_R_SLEW_MAX 30.0000
-param set-default FW_T_THR_DAMPING 0.2500
+param set-default FW_T_THR_DAMPING 0.1000
 param set-default FW_T_VERT_ACC 4.0000
 param set-default FW_T_SEB_R_FF 0.7000
 
@@ -247,3 +247,4 @@ param set-default DELTA_T_Y_CS 0.1000
 
 param set-default FREE_AILERONS 1
 param set-default NAV_LOITER_RAD 55.0000
+param set-default FW_T_RLL2THR 0.0000

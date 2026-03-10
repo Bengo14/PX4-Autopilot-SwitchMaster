@@ -237,6 +237,7 @@ dataman start
 if ! replay tryapplyparams
 then
 	export PX4_SIM_HOST_ADDR=172.31.128.1
+	export PX4_GZ_MODEL_POSE="0 0 0.001 0 0 1.60"
 	. px4-rc.simulator
 fi
 

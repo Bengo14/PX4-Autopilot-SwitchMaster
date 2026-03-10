@@ -1311,7 +1311,7 @@ FixedwingPositionControl::evaluate_gamma_and_start_time(bool climb_mode) {
 	_counter %= MAX_NUM_GAMMA;*/
 
 	float gamma_sp;
-	gamma_sp = degrees(atanf((_pos_sp_alt - _prev_pos_sp_alt) / (_wp_distance - 10.0f))); // positive in climb mode, negative in sink
+	gamma_sp = degrees(atanf((_pos_sp_alt - _prev_pos_sp_alt) / (_wp_distance - 20.0f))); // positive in climb mode, negative in sink
 	gamma_sp = fabsf(gamma_sp);
 	gamma_sp = ceilf(gamma_sp); // approx to upper integer value
 

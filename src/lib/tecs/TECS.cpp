@@ -516,6 +516,10 @@ void TECSControl::_calcPitchControlUpdate(float dt, const Input &input, const Co
 
 		// Calculate pitch integrator input term
 		float pitch_integ_input = _getControlError(seb_rate) * param.integrator_gain_pitch / climb_angle_to_SEB_rate;
+		
+		if (_glide_mode) {
+			pitch_integ_input *= 2.0f; // in glide mode consider only speed control and increase integrator gain
+		}
 
 		// Prevent the integrator changing in a direction that will increase pitch demand saturation
 		if (_pitch_setpoint >= param.pitch_max) {
